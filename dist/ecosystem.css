@@ -29,7 +29,7 @@
 .eco-node-wallet{left:21.571%;top:36.316%}
 .eco-node-pay{left:86%;top:40.702%}
 .eco-node-stake{left:52.429%;top:78.772%}
-.eco-node-orb{position:relative;display:grid;place-items:center;width:58px;height:58px;border:1px solid #5b7348;border-radius:50%;color:#a8be95;background:radial-gradient(ellipse at 30% 15%,#26351d,#0e140b 75%);box-shadow:0 0 0 6px #080d08b0,0 5px 15px #0008;transition:color .2s,border-color .2s,box-shadow .2s,background .2s}
+.eco-node-orb{position:relative;display:grid;place-items:center;width:58px;height:58px;border:1px solid #5b7348;border-radius:50%;color:#a8be95;background:radial-gradient(ellipse at 30% 15%,#26351d,#0e140b 75%);box-shadow:0 0 0 6px #080d08b0,0 5px 15px #0008;transition:border-color .2s,box-shadow .2s}
 .eco-node-orb>svg{width:29px;height:29px}
 .eco-node-orb:before{position:absolute;content:"";inset:-5px;border:1px solid #68854e50;border-radius:50%;opacity:.5;transition:opacity .2s}
 .eco-node-satellite{position:absolute;inset:0;pointer-events:none;transform-origin:50% 50%}
@@ -100,7 +100,9 @@
 .eco-preview-pay .eco-card-foot{margin-top:0}
 .eco-yield{display:flex;align-items:center;gap:18px;padding:24px 0 18px}
 .eco-yield .eco-value{font-size:40px;color:#c0f397}
-.eco-yield .eco-value>span{color:#8fba70;font-size:29px}
+.eco-yield .eco-value>.eco-yield-number{font:inherit;color:inherit;font-variant-numeric:tabular-nums}
+.eco-yield .eco-value>.eco-yield-unit{color:#8fba70;font-size:29px}
+.eco-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .eco-yield-label{font-size:11px;line-height:1.6;color:#bacbad}
 .eco-yield-label small{font-size:10px;color:#718961}
 .eco-stake-chart{position:relative;height:88px;border-bottom:1px solid #2c3c23;margin-bottom:17px}

@@ -1,8 +1,10 @@
 // Scattered hexadecimal ink, deposited on the page and faded in place.
 const CONTROLS = 'a,button,input,select,textarea,summary,[role="button"],[role="listbox"],[role="slider"],[contenteditable]:not([contenteditable="false"])';
 const PANELS = '.payment-terminal,.eco-preview,.product-preview,.code-terminal,.business-card';
-const SOLID = `header,footer,dialog,${CONTROLS},${PANELS},.earn-term-option,.earn-confirmation-mark,img,video,iframe,[data-trail-obstacle],[data-no-trail],.planet-tag,.orbit-mark,.status-dot,.terminal-top i,.route-line,.mini-flow>i,.eco-asset-icon,.earn-rate-symbol`;
-const IGNORE_TEXT = `${SOLID},script,style,template,svg,canvas,.sr-only`;
+const FOREGROUND = `header,footer,dialog,${CONTROLS},.earn-term-option,.earn-confirmation-mark,img,video,iframe,[data-trail-obstacle],[data-no-trail],.planet-tag,.orbit-mark,.status-dot,.terminal-top i,.route-line,.mini-flow>i,.eco-asset-icon,.earn-rate-symbol`;
+const SOLID = `${FOREGROUND},${PANELS}`;
+const IGNORE_TEXT = `${FOREGROUND},script,style,template,svg,canvas,.sr-only`;
+const BURST_TARGETS = '.eco-cta,.earn-submit,#send-payment,.hero-actions .button';
 const SVG_PAINT = 'svg path,svg circle,svg ellipse,svg rect,svg line,svg polyline,svg polygon,svg text,svg image,svg use';
 const GLYPHS = '0123456789abcdef';
 const LIFE = 2650;
@@ -10,6 +12,7 @@ const CLEARANCE = 18;
 const GRID = 96;
 const nextSpacing = () => 2.2 + Math.random() * 2.8;
 const LIMIT = 600;
+const BURST_RESERVE = 64;
 const TAU = Math.PI * 2;
 
 export function initCursorTrail() {
@@ -21,16 +24,22 @@ export function initCursorTrail() {
   const ctx = canvas.getContext('2d');
   const mask = document.createElement('canvas');
   const ink = mask.getContext('2d');
+  const burstLayer = document.createElement('canvas');
+  const burstInk = burstLayer.getContext('2d');
   // The planet is a transparent, locally rendered canvas, not a rectangular image.
   const planetMask = document.createElement('canvas');
   const planetInk = planetMask.getContext('2d', { willReadFrequently: true });
-  if (!ctx || !ink || !planetInk) return { destroy() {} };
+  if (!ctx || !ink || !planetInk || !burstInk) return { destroy() {} };
   document.body.append(canvas);
 
   let particles = [], previous = null, untilNext = nextSpacing();
+  let normalCount = 0, burstCount = 0;
+  let widthFrom = 5 + Math.random() * 13, widthTo = 5 + Math.random() * 13;
+  let widthProgress = 0, widthSpan = 50 + Math.random() * 50;
   let frame = 0, width = 0, height = 0, scale = 1;
   let dirty = true, destroyed = false, hoveredCTA = null;
-  let words = [], solids = [], shapes = [], canvases = [], finalSections = [];
+  let words = [], solids = [], shapes = [], canvases = [], finalSections = [], instruments = [];
+  let protectedOvals = [];
   let visibleCache = new Map();
   let clearanceGrid = new Map(), clearanceCheck = 0;
   const paths = new WeakMap();
@@ -42,6 +51,7 @@ export function initCursorTrail() {
     previous = null;
     untilNext = nextSpacing();
     particles = [];
+    normalCount = burstCount = 0;
     hoveredCTA = null;
     ctx.clearRect(0, 0, width, height);
   }
@@ -53,6 +63,9 @@ export function initCursorTrail() {
     scale = Math.min(devicePixelRatio || 1, 2);
     canvas.width = Math.round(width * scale);
     canvas.height = Math.round(height * scale);
+    burstLayer.width = canvas.width;
+    burstLayer.height = canvas.height;
+    burstInk.setTransform(scale, 0, 0, scale, 0, 0);
     mask.width = Math.ceil(width);
     mask.height = Math.ceil(height);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -75,10 +88,11 @@ export function initCursorTrail() {
   function rebuild() {
     dirty = false;
     words = [];
-    solids = [...document.querySelectorAll(SOLID)].filter(element => !element.parentElement?.closest(SOLID));
-    shapes = [...document.querySelectorAll(SVG_PAINT)].filter(element => !element.closest('defs,clipPath,mask,pattern,[data-trail-background]') && !element.closest(SOLID));
-    canvases = [...document.querySelectorAll('canvas')].filter(element => element !== canvas && !element.closest(SOLID));
+    solids = [...document.querySelectorAll(SOLID)].filter(element => !element.parentElement?.closest(FOREGROUND));
+    shapes = [...document.querySelectorAll(SVG_PAINT)].filter(element => !element.closest('defs,clipPath,mask,pattern,[data-trail-background]') && !element.closest(FOREGROUND));
+    canvases = [...document.querySelectorAll('canvas')].filter(element => element !== canvas && !element.closest(FOREGROUND));
     finalSections = [...document.querySelectorAll('.final-section')];
+    instruments = [...document.querySelectorAll('.eco-instrument')];
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         return /\S/.test(node.data) && !node.parentElement?.closest(IGNORE_TEXT) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
@@ -123,6 +137,18 @@ export function initCursorTrail() {
     // Fade the WHOLE glyph before its ink reaches an edge, rather than cutting
     // it into a half-character at a button, word or panel boundary.
     const radius = size * .75;
+    let ovalFade = 1;
+    for (const oval of protectedOvals) {
+      const dx = x - oval.x, dy = y - oval.y;
+      const u = dx * oval.cos + dy * oval.sin;
+      const v = -dx * oval.sin + dy * oval.cos;
+      const q = Math.hypot(u / oval.rx, v / oval.ry);
+      if (q <= 1) return 0;
+      const gradient = Math.hypot(u / (oval.rx * oval.rx), v / (oval.ry * oval.ry)) / q;
+      const distance = (q - 1) / gradient;
+      const fade = Math.min(1, Math.max(0, (distance - radius) / 28));
+      ovalFade = Math.min(ovalFade, fade * fade * (3 - 2 * fade));
+    }
     const reach = radius + CLEARANCE;
     const check = ++clearanceCheck;
     let nearest = reach;
@@ -139,7 +165,7 @@ export function initCursorTrail() {
       }
     }
     const fade = Math.min(1, Math.max(0, (nearest - radius) / CLEARANCE));
-    return fade * fade * (3 - 2 * fade);
+    return fade * fade * (3 - 2 * fade) * ovalFade;
   }
 
   function shapePath(element) {
@@ -233,18 +259,25 @@ export function initCursorTrail() {
     }
   }
 
-  function paintMask() {
+  function panelHidden(element, ignoredPanel) {
+    const panel = element.closest(PANELS);
+    return panel && panel !== ignoredPanel;
+  }
+
+  function paintMask(ignoredPanel = null) {
     if (dirty) rebuild();
     visibleCache = new Map();
     clearanceGrid = new Map();
+    protectedOvals = [];
     ink.setTransform(1, 0, 0, 1, 0, 0);
     ink.clearRect(0, 0, width, height);
     ink.fillStyle = ink.strokeStyle = '#000';
     for (const element of solids) {
+      if (element === ignoredPanel || (panelHidden(element, ignoredPanel) && !element.matches(PANELS))) continue;
       if (visible(element)) for (const rect of element.getClientRects()) rectangle(rect, 3);
     }
     for (const entry of words) {
-      if (!visible(entry.element) || !onScreen(entry.element.getBoundingClientRect(), 20)) continue;
+      if (panelHidden(entry.element, ignoredPanel) || !visible(entry.element) || !onScreen(entry.element.getBoundingClientRect(), 20)) continue;
       const style = getComputedStyle(entry.element);
       const font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
       for (const word of entry.ranges) {
@@ -265,12 +298,33 @@ export function initCursorTrail() {
         }
       }
     }
-    for (const element of shapes) paintSVG(element);
+    for (const element of shapes) if (!panelHidden(element, ignoredPanel)) paintSVG(element);
     for (const element of canvases) {
+      if (panelHidden(element, ignoredPanel)) continue;
       const rect = element.getBoundingClientRect();
       if (!visible(element) || !onScreen(rect)) continue;
       if (element.id === 'orbit-planet') paintPlanet(element, rect);
       else rectangle(rect);
+    }
+    // Protect the orbital composition with an oval, leaving the map's blank
+    // rectangular corners open. Geometry follows the SVG's responsive matrix.
+    for (const instrument of instruments) {
+      if (!visible(instrument) || !onScreen(instrument.getBoundingClientRect())) continue;
+      const matrix = instrument.getScreenCTM();
+      if (!matrix) continue;
+      const angle = Math.atan2(matrix.b, matrix.a);
+      const oval = {
+        x: matrix.a * 350 + matrix.c * 300 + matrix.e,
+        y: matrix.b * 350 + matrix.d * 300 + matrix.f,
+        rx: 310 * Math.hypot(matrix.a, matrix.b),
+        ry: 235 * Math.hypot(matrix.c, matrix.d),
+        cos: Math.cos(angle), sin: Math.sin(angle)
+      };
+      if (!oval.rx || !oval.ry) continue;
+      protectedOvals.push(oval);
+      ink.beginPath();
+      ink.ellipse(oval.x, oval.y, oval.rx, oval.ry, angle, 0, TAU);
+      ink.fill();
     }
     // A failed/uninitialized hero uses a small CSS sphere, not its stage bounds.
     const fallback = document.querySelector('.planet-stage:not(.ready) .planet-fallback');
@@ -282,57 +336,89 @@ export function initCursorTrail() {
     }
   }
 
-  function draw(now) {
-    frame = 0;
-    ctx.clearRect(0, 0, width, height);
-    if (!enabled() || document.querySelector('dialog[open]')) { clear(); return; }
-    particles = particles.filter(p => now - p.born < p.life);
-    if (!particles.length) return;
-    paintMask();
-    const lightRects = finalSections.filter(visible).map(element => element.getBoundingClientRect());
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+  function drawParticles(list, target, now, lightRects) {
+    target.textAlign = 'center';
+    target.textBaseline = 'middle';
     const pageX = scrollX, pageY = scrollY;
-    for (const p of particles) {
+    for (const p of list) {
       const age = Math.max(0, (now - p.born) / p.life);
-      // Only the deliberate CTA burst moves. Ordinary ink has immutable page
-      // coordinates; subtracting scroll keeps it attached to its deposit spot.
+      // Only deliberate CTA bursts move. Ordinary ink keeps its original page
+      // coordinate, angle and size throughout its individual 2650ms lifetime.
       const travel = p.burst ? 1 - Math.pow(1 - age, 3) : 0;
       const x = p.x - pageX + (p.burst ? p.vx * travel : 0);
       const y = p.y - pageY + (p.burst ? p.vy * travel : 0);
       if (x < -20 || x > width + 20 || y < -20 || y > height + 20) continue;
       const clearance = proximity(x, y, p.size);
       if (!clearance) continue;
-      ctx.globalAlpha = p.alpha * Math.pow(1 - age, p.burst ? 1.7 : 1.35) * clearance;
-      ctx.fillStyle = lightRects.some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? '#102008' : '#bcff75';
-      ctx.font = `${p.size}px "DM Mono", monospace`;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(p.rotation);
-      ctx.fillText(p.glyph, 0, 0);
-      ctx.restore();
+      target.globalAlpha = p.alpha * Math.pow(1 - age, p.burst ? 1.7 : 1.35) * clearance;
+      target.fillStyle = lightRects.some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? '#102008' : '#bcff75';
+      target.font = `${p.size}px "DM Mono", monospace`;
+      target.save();
+      target.translate(x, y);
+      target.rotate(p.rotation);
+      target.fillText(p.glyph, 0, 0);
+      target.restore();
     }
-    ctx.globalAlpha = 1;
-    // Proximity fades protect rectangular content without chopping glyphs. A
-    // feathered mask also softens SVG/canvas contours, then its solid interior
-    // guarantees that changing content never has ink painted over it.
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.filter = 'blur(7px)';
-    ctx.drawImage(mask, 0, 0, width, height);
-    ctx.filter = 'none';
-    ctx.drawImage(mask, 0, 0, width, height);
-    ctx.globalCompositeOperation = 'source-over';
+    target.globalAlpha = 1;
+    target.globalCompositeOperation = 'destination-out';
+    target.filter = 'blur(7px)';
+    target.drawImage(mask, 0, 0, width, height);
+    target.filter = 'none';
+    target.drawImage(mask, 0, 0, width, height);
+    target.globalCompositeOperation = 'source-over';
+  }
+
+  function draw(now) {
+    frame = 0;
+    ctx.clearRect(0, 0, width, height);
+    if (!enabled() || document.querySelector('dialog[open]')) { clear(); return; }
+    particles = particles.filter(p => now - p.born < p.life);
+    normalCount = particles.reduce((count, p) => count + !p.burst, 0);
+    burstCount = particles.length - normalCount;
+    if (!particles.length) return;
+    paintMask();
+    const lightRects = finalSections.filter(visible).map(element => element.getBoundingClientRect());
+    drawParticles(particles.filter(p => !p.panel), ctx, now, lightRects);
+    // Payment bursts may enter ONLY their own panel's background. Draw that
+    // group separately, retaining every word, control and artwork inside it,
+    // and retaining all other panels. Normal trail never receives this waiver.
+    const panels = new Set(particles.filter(p => p.panel?.isConnected).map(p => p.panel));
+    for (const panel of panels) {
+      if (!visible(panel)) continue;
+      paintMask(panel);
+      burstInk.clearRect(0, 0, width, height);
+      drawParticles(particles.filter(p => p.panel === panel), burstInk, now, lightRects);
+      ctx.drawImage(burstLayer, 0, 0, width, height);
+    }
     frame = requestAnimationFrame(draw);
   }
 
   function add(particle) {
+    // Capacity limits new admissions, never an existing glyph's lifetime.
+    // Reserved burst slots keep a CTA response available during a dense sweep.
+    if (particle.burst ? burstCount >= BURST_RESERVE : normalCount >= LIMIT - BURST_RESERVE) return;
     particles.push({
       glyph: GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
       size: 6.5 + Math.floor(Math.random() * 6) * .5,
       rotation: (Math.random() - .5) * .48,
       ...particle
     });
-    if (particles.length > LIMIT) particles.splice(0, particles.length - LIMIT);
+    if (particle.burst) burstCount++;
+    else normalCount++;
+  }
+
+  function advanceWidth(distance) {
+    widthProgress += distance;
+    while (widthProgress >= widthSpan) {
+      widthProgress -= widthSpan;
+      widthFrom = widthTo;
+      const candidate = 5 + Math.random() * 13;
+      widthTo = Math.abs(candidate - widthFrom) >= 4 ? candidate : (widthFrom < 11.5 ? 14 + Math.random() * 4 : 5 + Math.random() * 4);
+      widthSpan = 50 + Math.random() * 50;
+    }
+    const fraction = widthProgress / widthSpan;
+    const eased = fraction * fraction * (3 - 2 * fraction);
+    return widthFrom + (widthTo - widthFrom) * eased;
   }
 
   function start() {
@@ -352,10 +438,13 @@ export function initCursorTrail() {
     const distance = Math.hypot(dx, dy);
     if (!distance) return;
     let at = Math.max(untilNext, distance - 320);
+    let advanced = 0;
     while (at <= distance) {
       const fraction = at / distance;
       const angle = Math.random() * TAU;
-      const spread = 2 + Math.sqrt(Math.random()) * 16;
+      const envelope = advanceWidth(at - advanced);
+      advanced = at;
+      const spread = Math.sqrt(Math.random()) * envelope;
       add({
         x: previous.x + dx * fraction + Math.cos(angle) * spread + scrollX,
         y: previous.y + dy * fraction + Math.sin(angle) * spread + 5 + scrollY,
@@ -367,26 +456,26 @@ export function initCursorTrail() {
       });
       at += nextSpacing();
     }
+    advanceWidth(distance - advanced);
     untilNext = at - distance;
     previous = next;
     start();
   }
 
-  function scroll(event) {
+  function resetPointer() {
     previous = null;
     untilNext = nextSpacing();
     hoveredCTA = null;
-    // Document scrolling preserves page-anchored deposits without creating any.
-    // A nested scroller has its own coordinate space, so discard stale deposits.
-    if (![document, window, document.documentElement, document.body].includes(event.target)) clear();
+    // Stop emitting without clearing or restarting the age of deposited ink.
   }
 
   function pointerOver(event) {
-    const link = event.target.closest?.('.eco-cta');
-    if (!link || link === hoveredCTA || link.contains(event.relatedTarget) || !enabled() || event.pointerType !== 'mouse' || document.querySelector('dialog[open]')) return;
+    const link = event.target.closest?.(BURST_TARGETS);
+    if (!link || link.disabled || link.getAttribute('aria-disabled') === 'true' || link === hoveredCTA || link.contains(event.relatedTarget) || !enabled() || event.pointerType !== 'mouse' || document.querySelector('dialog[open]')) return;
     hoveredCTA = link;
     const rect = link.getBoundingClientRect();
     const now = performance.now();
+    const panel = link.id === 'send-payment' ? link.closest(PANELS) : null;
     // A single compact burst begins OUTSIDE the control. Normals always point
     // away from the perimeter; the same foreground mask protects nearby copy.
     for (let index = 0; index < 16; index++) {
@@ -402,7 +491,7 @@ export function initCursorTrail() {
         y: (horizontal ? (side < 0 ? rect.top - 15 : rect.bottom + 15) : rect.top + rect.height * position) + scrollY,
         vx: normalX * travel + (horizontal ? tangent : 0),
         vy: normalY * travel + (horizontal ? 0 : tangent),
-        born: now, life: 720 + Math.random() * 300, alpha: .7, burst: true
+        born: now, life: 720 + Math.random() * 300, alpha: .7, burst: true, panel
       });
     }
     start();
@@ -423,9 +512,9 @@ export function initCursorTrail() {
   document.addEventListener('pointerover', pointerOver, { passive: true });
   document.addEventListener('pointerout', pointerOut, { passive: true });
   window.addEventListener('resize', resize, { passive: true });
-  window.addEventListener('scroll', scroll, { passive: true, capture: true });
+  window.addEventListener('scroll', resetPointer, { passive: true, capture: true });
   window.addEventListener('blur', clear);
-  document.documentElement.addEventListener('pointerleave', clear);
+  document.documentElement.addEventListener('pointerleave', resetPointer);
   document.addEventListener('visibilitychange', clear);
   finePointer.addEventListener('change', clear);
   reducedMotion.addEventListener('change', clear);
@@ -441,9 +530,9 @@ export function initCursorTrail() {
     document.removeEventListener('pointerover', pointerOver);
     document.removeEventListener('pointerout', pointerOut);
     window.removeEventListener('resize', resize);
-    window.removeEventListener('scroll', scroll, true);
+    window.removeEventListener('scroll', resetPointer, true);
     window.removeEventListener('blur', clear);
-    document.documentElement.removeEventListener('pointerleave', clear);
+    document.documentElement.removeEventListener('pointerleave', resetPointer);
     document.removeEventListener('visibilitychange', clear);
     finePointer.removeEventListener('change', clear);
     reducedMotion.removeEventListener('change', clear);

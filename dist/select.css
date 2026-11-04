@@ -41,3 +41,14 @@
 @media(max-width:420px){.orbit-select--network .orbit-select-trigger{font-size:10px;gap:5px;padding:8px 6px}.orbit-select--network .orbit-select-value{gap:5px}.orbit-select--network .orbit-select-glyph{width:20px;height:20px}.orbit-select--network .orbit-select-glyph svg{width:14px;height:14px}.orbit-select--asset .orbit-select-trigger{min-width:109px}}
 @media(prefers-reduced-motion:reduce){.orbit-select-popover{animation:none}.orbit-select-trigger,.orbit-select-chevron{transition:none}}
 @media(forced-colors:active){.orbit-select-trigger,.orbit-select-popover{border:1px solid ButtonText}.orbit-select-option--active{outline:1px solid Highlight;outline-offset:-2px}.orbit-select-check,.orbit-select-glyph{color:ButtonText}.orbit-select-option[aria-selected=true]{border-color:Highlight}}
+
+/* The menu follows the trigger's width and lists only alternative choices. */
+.orbit-select-heading{padding:9px 3px 8px;margin:0 2px 3px;font-size:7px;letter-spacing:.6px;line-height:1.55}
+.orbit-select-option{gap:6px;min-height:52px;padding:8px 5px}
+.orbit-select-option[hidden]{display:none}
+.orbit-select-option .orbit-select-glyph{width:21px;height:21px}
+.orbit-select-option .orbit-select-glyph svg{width:16px;height:16px}
+.orbit-select-option-title{font-size:11px;white-space:normal;overflow-wrap:anywhere}
+.orbit-select-option-subtitle{font-size:8px;line-height:1.4;overflow-wrap:anywhere}
+.orbit-select-check{display:none}
+@media(max-width:360px){.orbit-select-popover--network .orbit-select-option{gap:4px;padding:7px 3px}.orbit-select-popover--network .orbit-select-glyph{width:16px;height:16px}.orbit-select-popover--network .orbit-select-glyph svg{width:12px;height:12px}.orbit-select-popover--network .orbit-select-option-title{font-size:10px;white-space:nowrap}.orbit-select-popover--network .orbit-select-option-subtitle{font-size:7px}}

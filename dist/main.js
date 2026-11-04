@@ -40,10 +40,21 @@ function updatePayment() {
 }
 fields.forEach(f=>f.addEventListener('input',updatePayment)); updatePayment();
 let sending = false;
+const swapNetworks = $('#swap-networks');
+swapNetworks.addEventListener('click', () => {
+  if (sending) return;
+  const from = fields[2], to = fields[3];
+  [from.value, to.value] = [to.value, from.value];
+  for (const field of [from, to]) {
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  $('#payment-status').textContent = `ROUTE: ${from.value.toUpperCase()} → ${to.value.toUpperCase()} · DEMO`;
+});
 form.addEventListener('submit',async event => {
   event.preventDefault(); if(sending) return;
   if(!updatePayment()) { $('#amount').focus(); return; }
-  sending = true;
+  sending = true; swapNetworks.disabled = true;
   const payment = { ...currentPayment };
   const button=$('#send-payment'); button.disabled=true; fields.forEach(f=>f.disabled=true);
   const phases=['Finding your orbit…','Routing through the network…','Confirming arrival…'];
@@ -57,7 +68,7 @@ form.addEventListener('submit',async event => {
     form.hidden=true;receipt.hidden=false;receipt.setAttribute('tabindex','-1');receipt.focus({preventScroll:true});
     $('#another-payment').addEventListener('click',()=>{receipt.hidden=true;form.hidden=false;$('#amount').focus({preventScroll:true});});
     $('#download-receipt').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([receiptText],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download=`${receiptId}.txt`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Demo receipt saved.');});
-  } finally {sending=false;button.disabled=false;fields.forEach(f=>f.disabled=false);button.innerHTML='Send demo payment <span>↗</span>';$('#payment-status').innerHTML='<span class="status-dot"></span> SANDBOX MODE · NO REAL FUNDS';$('.payment-terminal').classList.remove('processing');}
+  } finally {sending=false;swapNetworks.disabled=false;button.disabled=false;fields.forEach(f=>f.disabled=false);button.innerHTML='Send demo payment <span>↗</span>';$('#payment-status').innerHTML='<span class="status-dot"></span> SANDBOX MODE · NO REAL FUNDS';$('.payment-terminal').classList.remove('processing');}
 });
 
 initEcosystem($('#ecosystem-root'));

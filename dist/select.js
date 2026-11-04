@@ -127,9 +127,9 @@ export function enhanceSelect(select, { kind = 'network' } = {}) {
     cleanups.push(() => target.removeEventListener(type, handler, options));
   };
   const unavailable = () => select.matches(':disabled');
-  const isEnabled = index => Boolean(rows[index] && !rows[index].disabled);
-  const firstEnabled = () => rows.findIndex(row => !row.disabled);
-  const lastEnabled = () => rows.findLastIndex(row => !row.disabled);
+  const isEnabled = index => Boolean(rows[index] && !rows[index].disabled && !rows[index].hidden);
+  const firstEnabled = () => rows.findIndex((_, index) => isEnabled(index));
+  const lastEnabled = () => rows.findLastIndex((_, index) => isEnabled(index));
 
   function markActive(index, scroll = true) {
     activeIndex = isEnabled(index) ? index : firstEnabled();
@@ -155,14 +155,14 @@ export function enhanceSelect(select, { kind = 'network' } = {}) {
     const viewportTop = viewport?.offsetTop || 0;
     const margin = 12, gap = 8;
     if (rect.bottom < viewportTop || rect.top > viewportTop + height) { close(); return; }
-    const popoverWidth = Math.min(Math.max(rect.width, 248), Math.max(0, width - margin * 2));
+    const popoverWidth = Math.min(rect.width, Math.max(0, width - margin * 2));
+    popover.style.width = `${popoverWidth}px`;
     const left = Math.max(viewportLeft + margin, Math.min(rect.right - popoverWidth, viewportLeft + width - popoverWidth - margin));
     const below = Math.max(0, viewportTop + height - rect.bottom - gap - margin);
     const above = Math.max(0, rect.top - viewportTop - gap - margin);
     const desiredHeight = header.offsetHeight + listbox.scrollHeight + 10;
     const upwards = below < desiredHeight && above > below;
     const availableHeight = upwards ? above : below;
-    popover.style.width = `${popoverWidth}px`;
     popover.style.maxHeight = `${availableHeight}px`;
     listbox.style.maxHeight = `${Math.max(0, availableHeight - header.offsetHeight - 10)}px`;
     popover.style.left = `${left}px`;
@@ -172,7 +172,7 @@ export function enhanceSelect(select, { kind = 'network' } = {}) {
   }
 
   function schedulePosition(event) {
-    if (!isOpen || (event && popover.contains(event.target))) return;
+    if (!isOpen || (event?.target instanceof Node && popover.contains(event.target))) return;
     cancelAnimationFrame(repositionFrame);
     repositionFrame = requestAnimationFrame(position);
   }
@@ -228,6 +228,7 @@ export function enhanceSelect(select, { kind = 'network' } = {}) {
       node.dataset.index = String(index);
       node.setAttribute('role', 'option');
       node.setAttribute('aria-selected', String(option.selected));
+      node.hidden = option.selected;
       const disabled = option.disabled || (option.parentElement?.tagName === 'OPTGROUP' && option.parentElement.disabled);
       if (disabled) node.setAttribute('aria-disabled', 'true');
       const copy = element('span', 'orbit-select-option-copy');
@@ -237,7 +238,7 @@ export function enhanceSelect(select, { kind = 'network' } = {}) {
       check.append(vector('check'));
       node.append(glyph(option.value), copy, check);
       listbox.append(node);
-      return { node, disabled };
+      return { node, disabled, hidden: option.selected };
     });
     const selected = select.options[select.selectedIndex];
     valueNode.replaceChildren();
@@ -283,7 +284,7 @@ export function enhanceSelect(select, { kind = 'network' } = {}) {
   listen(trigger, 'keydown', event => {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
       event.preventDefault();
-      open(event.key === 'Home' ? firstEnabled() : event.key === 'End' ? lastEnabled() : select.selectedIndex);
+      open(event.key === 'ArrowUp' || event.key === 'End' ? lastEnabled() : firstEnabled());
     } else if (event.key.length === 1 && event.key !== ' ' && !event.metaKey && !event.ctrlKey && !event.altKey) {
       event.preventDefault(); open(); search(event.key);
     }

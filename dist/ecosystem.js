@@ -34,9 +34,9 @@ const PRODUCTS = {
     number: '03', name: 'Stake', channel: 'GROW', title: 'Give your ETH a purpose.',
     description: 'Explore staking with a clear view of your position, rewards, and the way it all works.',
     cta: 'Explore the staking demo', href: '#earn',
-    preview: `<div class="eco-card-heading"><span>ETHEREUM STAKING</span><span class="eco-demo-label">DEMO</span></div>
-      <div class="eco-yield"><span class="eco-value">6.8<span>%</span></span><span class="eco-yield-label">Illustrative APY<br><small>Not a live rate</small></span></div>
-      <div class="eco-stake-chart" aria-hidden="true"><svg viewBox="0 0 350 66" preserveAspectRatio="none"><path d="M0 50H350M0 24H350" fill="none" stroke="#23331e" stroke-dasharray="2 5"/><path d="m0 58 28-4 22 2 27-12 25 4 30-10 23 2 30-10 29 3 28-15 27 4 29-12 25 4 27-11" fill="none" stroke="#bcff75" stroke-width="2"/><circle cx="350" cy="3" r="3" fill="#bcff75"/></svg><span>ILLUSTRATIVE REWARD CURVE</span></div>
+    preview: prefix => `<div class="eco-card-heading"><span>ETHEREUM STAKING</span><span class="eco-demo-label">DEMO</span></div>
+      <div class="eco-yield"><span class="eco-value"><span class="eco-yield-number" aria-hidden="true">6.8</span><span class="eco-yield-unit" aria-hidden="true">%</span><span class="eco-sr-only">6.8 percent</span></span><span class="eco-yield-label">Illustrative APY<br><small>Not a live rate</small></span></div>
+      <div class="eco-stake-chart" role="img" aria-label="Illustrative staking reward curve at 6.8 percent APY; example only"><svg viewBox="0 0 350 66" preserveAspectRatio="none" aria-hidden="true"><defs><clipPath id="${prefix}-stake-reveal" clipPathUnits="userSpaceOnUse"><rect class="eco-stake-reveal-mask" x="-6" y="-6" width="362" height="78"/></clipPath></defs><path d="M0 50H350M0 24H350" fill="none" stroke="#23331e" stroke-dasharray="2 5"/><g class="eco-stake-chart-data"><path d="m0 58 28-4 22 2 27-12 25 4 30-10 23 2 30-10 29 3 28-15 27 4 29-12 25 4 27-11" fill="none" stroke="#bcff75" stroke-width="2"/><circle cx="350" cy="3" r="3" fill="#bcff75"/></g></svg><span>ILLUSTRATIVE REWARD CURVE</span></div>
       <dl class="eco-stake-lines"><div><dt>Your demo position</dt><dd>2.4000 <span>ETH</span></dd></div><div><dt>Demo annual rewards</dt><dd class="eco-lime">+0.1632 <span>ETH</span></dd></div></dl>
       <div class="eco-card-foot"><span class="eco-tiny-dot"></span> Example only. Actual rewards can vary.</div>`,
   },
@@ -164,6 +164,73 @@ function instrument(id) {
 
 let instanceCount = 0;
 
+function initStakeEntrance(preview, prefix, motionPreference) {
+  const rate = preview.querySelector('.eco-yield');
+  const number = preview.querySelector('.eco-yield-number');
+  const chart = preview.querySelector('.eco-stake-chart');
+  const chartData = preview.querySelector('.eco-stake-chart-data');
+  const revealMask = preview.querySelector('.eco-stake-reveal-mask');
+  const frames = new Set();
+  const entrances = new Map();
+  let observer;
+  let disposed = false;
+
+  function settle() {
+    observer?.disconnect();
+    entrances.clear();
+    frames.forEach(frame => cancelAnimationFrame(frame));
+    frames.clear();
+    number.textContent = '6.8';
+    chartData.removeAttribute('clip-path');
+  }
+
+  function animate(duration, paint, complete = () => {}) {
+    let start;
+    function schedule() {
+      const frame = requestAnimationFrame(time => {
+        frames.delete(frame);
+        if (disposed) return;
+        if (motionPreference.matches) { settle(); return; }
+        start ??= time;
+        const progress = Math.min((time - start) / duration, 1);
+        paint(1 - (1 - progress) ** 3);
+        if (progress < 1) schedule();
+        else complete();
+      });
+      frames.add(frame);
+    }
+    schedule();
+  }
+
+  // Only the hidden visual number changes. Its accessible final value and the
+  // chart description stay fixed throughout this entrance.
+  if (motionPreference.matches || !window.IntersectionObserver) return settle;
+  number.textContent = '0.1';
+  chartData.setAttribute('clip-path', `url(#${prefix}-stake-reveal)`);
+  revealMask.setAttribute('width', '0');
+  entrances.set(rate, () => animate(1250, progress => { number.textContent = (0.1 + 6.7 * progress).toFixed(1); }));
+  entrances.set(chart, () => animate(1050, progress => { revealMask.setAttribute('width', String(362 * progress)); }, () => chartData.removeAttribute('clip-path')));
+  observer = new window.IntersectionObserver(entries => {
+    if (disposed) return;
+    for (const entry of entries) {
+      if (!entry.isIntersecting || entry.intersectionRatio < .25) continue;
+      const enter = entrances.get(entry.target);
+      if (!enter) continue;
+      entrances.delete(entry.target);
+      observer.unobserve(entry.target);
+      enter();
+    }
+  }, { threshold: .25 });
+  entrances.forEach((_, target) => observer.observe(target));
+  function onMotionChange() { if (motionPreference.matches) settle(); }
+  motionPreference.addEventListener('change', onMotionChange);
+  return () => {
+    disposed = true;
+    settle();
+    motionPreference.removeEventListener('change', onMotionChange);
+  };
+}
+
 /** Mount the self-contained Wallet / Pay / Stake orbital product explorer. */
 export function initEcosystem(root) {
   if (!root) return null;
@@ -186,11 +253,14 @@ export function initEcosystem(root) {
   const buttons = [...root.querySelectorAll('[data-eco-product]')];
   let selected;
   let visible = false;
+  let disposeStakeEntrance = () => {};
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   function selectProduct(key) {
     const product = PRODUCTS[key];
     if (!product || key === selected) return;
+    disposeStakeEntrance();
+    disposeStakeEntrance = () => {};
     selected = key;
     shell.dataset.ecoSelected = key;
     buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.ecoProduct === key)));
@@ -199,7 +269,9 @@ export function initEcosystem(root) {
     root.querySelector('.eco-map-progress > span').textContent = `${product.number}—03`;
     root.querySelectorAll('[data-eco-route]').forEach(path => path.classList.toggle('is-active', path.dataset.ecoRoute === key));
     detail.setAttribute('aria-label', `${product.name} preview`);
-    detail.innerHTML = `<div class="eco-detail-label"><span>ORBIT ${product.name.toUpperCase()}</span><span>${product.number} / 03</span></div><h3>${product.title}</h3><p class="eco-detail-description">${product.description}</p><div class="eco-preview eco-preview-${key}">${product.preview}</div><a class="eco-cta" href="${product.href}">${product.cta}<span aria-hidden="true">↗</span></a><span class="eco-disclosure">FICTIONAL PRODUCT · ILLUSTRATIVE DATA</span>`;
+    const preview = typeof product.preview === 'function' ? product.preview(id) : product.preview;
+    detail.innerHTML = `<div class="eco-detail-label"><span>ORBIT ${product.name.toUpperCase()}</span><span>${product.number} / 03</span></div><h3>${product.title}</h3><p class="eco-detail-description">${product.description}</p><div class="eco-preview eco-preview-${key}">${preview}</div><a class="eco-cta" href="${product.href}">${product.cta}<span aria-hidden="true">↗</span></a><span class="eco-disclosure">FICTIONAL PRODUCT · ILLUSTRATIVE DATA</span>`;
+    if (key === 'stake') disposeStakeEntrance = initStakeEntrance(detail, id, reducedMotion);
   }
 
   function handleClick(event) {
@@ -258,6 +330,7 @@ export function initEcosystem(root) {
   const controller = {
     selectProduct,
     destroy() {
+      disposeStakeEntrance();
       observer?.disconnect();
       root.removeEventListener('click', handleClick);
       root.removeEventListener('keydown', handleKeys);

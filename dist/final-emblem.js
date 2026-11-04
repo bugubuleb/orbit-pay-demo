@@ -1,6 +1,7 @@
-/** The closing mark: a static, two-line hexadecimal orbit and an engraved globe. */
+/** A fixed hex-ring globe with one satellite pass on hover or CTA keyboard focus. */
 
 let nextEmblemId = 0;
+const controllers = new WeakMap();
 const TAU = Math.PI * 2;
 const HEX = '0123456789ABCDEF';
 const round = value => Number(value.toFixed(3));
@@ -78,9 +79,10 @@ function globeGrid() {
 }
 
 export function initFinalEmblem(root) {
-  if (!root) return;
+  if (!root) return null;
   const svg = root.tagName?.toLowerCase() === 'svg' ? root : root.querySelector?.('svg');
-  if (!svg) return;
+  if (!svg) return null;
+  controllers.get(svg)?.destroy();
 
   const id = `orbit-closing-mark-${++nextEmblemId}`;
   const outer = `${id}-outer`;
@@ -102,6 +104,12 @@ export function initFinalEmblem(root) {
     <g fill="currentColor" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" transform="rotate(-35 70 70)">
       ${rows}
     </g>
+    <g transform="rotate(-35 70 70)">
+      <g class="final-satellite-back" transform="translate(70 47)">
+        <circle r="7" fill="currentColor"/>
+        <circle r="2.5" fill="var(--lime, #bcff75)"/>
+      </g>
+    </g>
     <circle cx="70" cy="70" r="31" fill="var(--lime, #bcff75)" stroke="currentColor" stroke-width="2.3"/>
     <g fill="none" stroke="currentColor" stroke-linecap="round" clip-path="url(#${id}-globe)">
       ${globeGrid()}
@@ -110,7 +118,91 @@ export function initFinalEmblem(root) {
       <ellipse cx="70" cy="70" rx="61" ry="23" fill="none" stroke="var(--lime, #bcff75)" stroke-width="10"/>
       <g fill="currentColor" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">${rows}</g>
     </g>
-    <circle cx="117" cy="32" r="7" fill="currentColor"/>
-    <circle cx="117" cy="32" r="2.5" fill="var(--lime, #bcff75)"/>
+    <g transform="rotate(-35 70 70)">
+      <g class="final-satellite-front" transform="translate(70 47)" visibility="hidden">
+        <circle r="7" fill="currentColor"/>
+        <circle r="2.5" fill="var(--lime, #bcff75)"/>
+      </g>
+    </g>
   `;
+
+  const doc = svg.ownerDocument;
+  const win = doc.defaultView;
+  const rear = svg.querySelector('.final-satellite-back');
+  const front = svg.querySelector('.final-satellite-front');
+  const cta = svg.closest('.final-section')?.querySelector('.button');
+  const motion = win.matchMedia('(prefers-reduced-motion: reduce)');
+  const duration = 2200;
+  let frame = 0;
+  let started = null;
+  let running = false;
+  let destroyed = false;
+
+  function position(progress) {
+    // Use the middle of the two hex rows. The upper half is behind the opaque
+    // globe; at rest the complete satellite fits behind its northern edge.
+    const angle = -Math.PI / 2 + progress * TAU;
+    const x = round(70 + Math.cos(angle) * 61);
+    const y = round(70 + Math.sin(angle) * 23);
+    const inFront = Math.sin(angle) >= 0;
+    for (const satellite of [rear, front]) {
+      satellite.setAttribute('transform', `translate(${x} ${y})`);
+    }
+    rear.setAttribute('visibility', inFront ? 'hidden' : 'visible');
+    front.setAttribute('visibility', inFront ? 'visible' : 'hidden');
+  }
+
+  function stop() {
+    win.cancelAnimationFrame(frame);
+    frame = 0;
+    started = null;
+    running = false;
+    position(0);
+  }
+
+  function tick(now) {
+    if (destroyed || motion.matches || doc.hidden) { stop(); return; }
+    if (started === null) started = now;
+    const progress = Math.min((now - started) / duration, 1);
+    position(progress);
+    if (progress === 1) {
+      frame = 0;
+      started = null;
+      running = false;
+      return;
+    }
+    frame = win.requestAnimationFrame(tick);
+  }
+
+  function play() {
+    if (destroyed || running || motion.matches || doc.hidden) return;
+    running = true;
+    started = null;
+    frame = win.requestAnimationFrame(tick);
+  }
+
+  function onPointerEnter(event) { if (event.pointerType !== 'touch') play(); }
+  function onFocus() { if (cta?.matches(':focus-visible')) play(); }
+  function onMotionChange() { if (motion.matches) stop(); }
+  function onVisibilityChange() { if (doc.hidden) stop(); }
+
+  svg.addEventListener('pointerenter', onPointerEnter);
+  cta?.addEventListener('focus', onFocus);
+  motion.addEventListener('change', onMotionChange);
+  doc.addEventListener('visibilitychange', onVisibilityChange);
+
+  const controller = {
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      stop();
+      svg.removeEventListener('pointerenter', onPointerEnter);
+      cta?.removeEventListener('focus', onFocus);
+      motion.removeEventListener('change', onMotionChange);
+      doc.removeEventListener('visibilitychange', onVisibilityChange);
+      if (controllers.get(svg) === controller) controllers.delete(svg);
+    },
+  };
+  controllers.set(svg, controller);
+  return controller;
 }
