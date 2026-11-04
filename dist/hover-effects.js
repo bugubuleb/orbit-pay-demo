@@ -1,5 +1,8 @@
+import { initBrandOrbit } from './brand-orbit.js';
+
 /** Small, finite responses. Leaving a control never cuts its motion mid-turn. */
 export function initHoverEffects() {
+  const brandOrbit = initBrandOrbit();
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const active = new Set();
   const running = new WeakSet();
@@ -25,11 +28,6 @@ export function initHoverEffects() {
     bind(focusElement, 'focus', () => { if (focusElement.matches(':focus-visible')) action(); });
   }
 
-  const brand = document.querySelector('.header .brand');
-  hover(brand, () => play(brand.querySelector('.orbit-mark'), [
-    { transform: 'rotate(-35deg)' }, { transform: 'rotate(325deg)' }
-  ], 1300));
-
   const plus = document.querySelector('.earn-method-mark');
   hover(plus, () => play(plus, [{ transform: 'rotate(-180deg)' }, { transform: 'rotate(0deg)' }], 750), document.querySelector('.earn-method summary'));
 
@@ -46,5 +44,5 @@ export function initHoverEffects() {
   function stop() { for (const animation of [...active]) animation.cancel(); }
   function onMotionChange() { if (motion.matches) stop(); }
   motion.addEventListener('change', onMotionChange);
-  return { destroy() { stop(); listeners.forEach(remove => remove()); motion.removeEventListener('change', onMotionChange); } };
+  return { destroy() { brandOrbit?.destroy(); stop(); listeners.forEach(remove => remove()); motion.removeEventListener('change', onMotionChange); } };
 }

@@ -23,3 +23,9 @@
   .developer-layout{padding-top:12px}
   .business-section>h2{margin-top:26px;margin-bottom:30px}
 }
+
+/* Let wrapped hero copy establish the section height; keep the status rail below it. */
+@media(min-width:761px){
+  .hero{height:auto;min-height:clamp(720px,calc(100svh - 88px),950px);max-height:none}
+  .hero-copy{padding-bottom:120px}
+}

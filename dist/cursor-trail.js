@@ -1,11 +1,15 @@
-// Hexadecimal ink in the page's negative space. Layout boxes are not obstacles.
+// Scattered hexadecimal ink, deposited on the page and faded in place.
 const CONTROLS = 'a,button,input,select,textarea,summary,[role="button"],[role="listbox"],[role="slider"],[contenteditable]:not([contenteditable="false"])';
-const SOLID = `header,footer,dialog,${CONTROLS},img,video,iframe,[data-trail-obstacle],[data-no-trail],.planet-tag,.orbit-mark,.status-dot,.terminal-top i,.route-line,.mini-flow>i,.eco-asset-icon,.earn-rate-symbol`;
+const PANELS = '.payment-terminal,.eco-preview,.product-preview,.code-terminal,.business-card';
+const SOLID = `header,footer,dialog,${CONTROLS},${PANELS},.earn-term-option,.earn-confirmation-mark,img,video,iframe,[data-trail-obstacle],[data-no-trail],.planet-tag,.orbit-mark,.status-dot,.terminal-top i,.route-line,.mini-flow>i,.eco-asset-icon,.earn-rate-symbol`;
 const IGNORE_TEXT = `${SOLID},script,style,template,svg,canvas,.sr-only`;
 const SVG_PAINT = 'svg path,svg circle,svg ellipse,svg rect,svg line,svg polyline,svg polygon,svg text,svg image,svg use';
 const GLYPHS = '0123456789abcdef';
-const SPACING = 5.2;
-const LIMIT = 280;
+const LIFE = 2650;
+const CLEARANCE = 18;
+const GRID = 96;
+const nextSpacing = () => 2.2 + Math.random() * 2.8;
+const LIMIT = 600;
 const TAU = Math.PI * 2;
 
 export function initCursorTrail() {
@@ -23,11 +27,12 @@ export function initCursorTrail() {
   if (!ctx || !ink || !planetInk) return { destroy() {} };
   document.body.append(canvas);
 
-  let particles = [], previous = null, carry = 0, sequence = 0;
+  let particles = [], previous = null, untilNext = nextSpacing();
   let frame = 0, width = 0, height = 0, scale = 1;
   let dirty = true, destroyed = false, hoveredCTA = null;
   let words = [], solids = [], shapes = [], canvases = [], finalSections = [];
   let visibleCache = new Map();
+  let clearanceGrid = new Map(), clearanceCheck = 0;
   const paths = new WeakMap();
   const enabled = () => finePointer.matches && !reducedMotion.matches && !document.hidden;
 
@@ -35,7 +40,7 @@ export function initCursorTrail() {
     cancelAnimationFrame(frame);
     frame = 0;
     previous = null;
-    carry = 0;
+    untilNext = nextSpacing();
     particles = [];
     hoveredCTA = null;
     ctx.clearRect(0, 0, width, height);
@@ -83,7 +88,7 @@ export function initCursorTrail() {
     while ((node = walker.nextNode())) {
       const ranges = [];
       // Word ranges preserve the real line wrapping and leave margins, line gaps,
-      // whitespace and the unused part of a heading/form/card available.
+      // whitespace and the unused part of unpanelled headings/forms available.
       for (const match of node.data.matchAll(/\S+/gu)) {
         const range = document.createRange();
         range.setStart(node, match.index);
@@ -94,8 +99,47 @@ export function initCursorTrail() {
     }
   }
 
+  function addClearance(left, top, right, bottom) {
+    const rect = { left, top, right, bottom, checked: 0 };
+    // A compact screen grid keeps proximity work local even on text-heavy pages.
+    const x1 = Math.floor(Math.max(-GRID, left) / GRID);
+    const x2 = Math.floor(Math.min(width + GRID, right) / GRID);
+    const y1 = Math.floor(Math.max(-GRID, top) / GRID);
+    const y2 = Math.floor(Math.min(height + GRID, bottom) / GRID);
+    for (let y = y1; y <= y2; y++) for (let x = x1; x <= x2; x++) {
+      const key = `${x},${y}`;
+      if (!clearanceGrid.has(key)) clearanceGrid.set(key, []);
+      clearanceGrid.get(key).push(rect);
+    }
+  }
+
   function rectangle(rect, padding = 2) {
-    if (onScreen(rect, padding)) ink.fillRect(rect.left - padding, rect.top - padding, rect.width + padding * 2, rect.height + padding * 2);
+    if (!onScreen(rect, padding + CLEARANCE)) return;
+    ink.fillRect(rect.left - padding, rect.top - padding, rect.width + padding * 2, rect.height + padding * 2);
+    addClearance(rect.left - padding, rect.top - padding, rect.right + padding, rect.bottom + padding);
+  }
+
+  function proximity(x, y, size) {
+    // Fade the WHOLE glyph before its ink reaches an edge, rather than cutting
+    // it into a half-character at a button, word or panel boundary.
+    const radius = size * .75;
+    const reach = radius + CLEARANCE;
+    const check = ++clearanceCheck;
+    let nearest = reach;
+    for (let row = Math.floor((y - reach) / GRID); row <= Math.floor((y + reach) / GRID); row++) {
+      for (let column = Math.floor((x - reach) / GRID); column <= Math.floor((x + reach) / GRID); column++) {
+        for (const rect of clearanceGrid.get(`${column},${row}`) || []) {
+          if (rect.checked === check) continue;
+          rect.checked = check;
+          const dx = Math.max(rect.left - x, 0, x - rect.right);
+          const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+          nearest = Math.min(nearest, Math.hypot(dx, dy));
+          if (nearest <= radius) return 0;
+        }
+      }
+    }
+    const fade = Math.min(1, Math.max(0, (nearest - radius) / CLEARANCE));
+    return fade * fade * (3 - 2 * fade);
   }
 
   function shapePath(element) {
@@ -192,6 +236,7 @@ export function initCursorTrail() {
   function paintMask() {
     if (dirty) rebuild();
     visibleCache = new Map();
+    clearanceGrid = new Map();
     ink.setTransform(1, 0, 0, 1, 0, 0);
     ink.clearRect(0, 0, width, height);
     ink.fillStyle = ink.strokeStyle = '#000';
@@ -214,7 +259,9 @@ export function initCursorTrail() {
           word.font = font;
         }
         for (const rect of word.range.getClientRects()) {
-          if (onScreen(rect)) ink.fillRect(rect.left - word.left - 1.5, rect.top - 1.5, rect.width + word.left + word.right + 3, rect.height + 3);
+          if (!onScreen(rect, CLEARANCE)) continue;
+          ink.fillRect(rect.left - word.left - 1.5, rect.top - 1.5, rect.width + word.left + word.right + 3, rect.height + 3);
+          addClearance(rect.left - word.left - 1.5, rect.top - 1.5, rect.right + word.right + 1.5, rect.bottom + 1.5);
         }
       }
     }
@@ -243,29 +290,48 @@ export function initCursorTrail() {
     if (!particles.length) return;
     paintMask();
     const lightRects = finalSections.filter(visible).map(element => element.getBoundingClientRect());
-    ctx.font = '8px "DM Mono", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    const pageX = scrollX, pageY = scrollY;
     for (const p of particles) {
-      const age = (now - p.born) / p.life;
-      const distance = p.burst ? (1 - Math.pow(1 - age, 3)) : age;
-      const x = p.x + p.vx * distance;
-      const y = p.y + p.vy * distance;
-      ctx.globalAlpha = p.alpha * Math.pow(1 - age, p.burst ? 1.7 : 1.35);
+      const age = Math.max(0, (now - p.born) / p.life);
+      // Only the deliberate CTA burst moves. Ordinary ink has immutable page
+      // coordinates; subtracting scroll keeps it attached to its deposit spot.
+      const travel = p.burst ? 1 - Math.pow(1 - age, 3) : 0;
+      const x = p.x - pageX + (p.burst ? p.vx * travel : 0);
+      const y = p.y - pageY + (p.burst ? p.vy * travel : 0);
+      if (x < -20 || x > width + 20 || y < -20 || y > height + 20) continue;
+      const clearance = proximity(x, y, p.size);
+      if (!clearance) continue;
+      ctx.globalAlpha = p.alpha * Math.pow(1 - age, p.burst ? 1.7 : 1.35) * clearance;
       ctx.fillStyle = lightRects.some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? '#102008' : '#bcff75';
-      ctx.fillText(p.glyph, x, y);
+      ctx.font = `${p.size}px "DM Mono", monospace`;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(p.rotation);
+      ctx.fillText(p.glyph, 0, 0);
+      ctx.restore();
     }
     ctx.globalAlpha = 1;
-    // Applied on every painted frame, including after DOM changes or movement:
-    // old particles cannot drift across newly rendered text, controls or artwork.
+    // Proximity fades protect rectangular content without chopping glyphs. A
+    // feathered mask also softens SVG/canvas contours, then its solid interior
+    // guarantees that changing content never has ink painted over it.
     ctx.globalCompositeOperation = 'destination-out';
+    ctx.filter = 'blur(7px)';
+    ctx.drawImage(mask, 0, 0, width, height);
+    ctx.filter = 'none';
     ctx.drawImage(mask, 0, 0, width, height);
     ctx.globalCompositeOperation = 'source-over';
     frame = requestAnimationFrame(draw);
   }
 
   function add(particle) {
-    particles.push({ glyph: GLYPHS[Math.floor(Math.random() * GLYPHS.length)], ...particle });
+    particles.push({
+      glyph: GLYPHS[Math.floor(Math.random() * GLYPHS.length)],
+      size: 6.5 + Math.floor(Math.random() * 6) * .5,
+      rotation: (Math.random() - .5) * .48,
+      ...particle
+    });
     if (particles.length > LIMIT) particles.splice(0, particles.length - LIMIT);
   }
 
@@ -274,28 +340,45 @@ export function initCursorTrail() {
   }
 
   function move(event) {
-    if (!enabled() || event.pointerType !== 'mouse' || document.querySelector('dialog[open]') || event.target.closest?.(`header,footer,${CONTROLS}`)) {
+    if (!enabled() || event.pointerType !== 'mouse' || document.querySelector('dialog[open]') || event.target.closest?.(`header,footer,${CONTROLS},${PANELS},.earn-term-option`)) {
       previous = null;
-      carry = 0;
+      untilNext = nextSpacing();
       return;
     }
     const now = performance.now();
     const next = { x: event.clientX, y: event.clientY, time: now };
-    if (!previous || now - previous.time > 180) { previous = next; carry = 0; return; }
+    if (!previous || now - previous.time > 180) { previous = next; untilNext = nextSpacing(); return; }
     const dx = next.x - previous.x, dy = next.y - previous.y;
     const distance = Math.hypot(dx, dy);
     if (!distance) return;
-    const nx = -dy / distance, ny = dx / distance;
-    const first = Math.max(SPACING - carry, distance - SPACING * 70);
-    for (let at = first; at <= distance; at += SPACING) {
-      const x = previous.x + dx * at / distance;
-      const y = previous.y + dy * at / distance + 7;
-      add({ x: x + nx * 3.4, y: y + ny * 3.4, vx: nx * 1.5, vy: 3 + ny * 1.5, born: now, life: 2200 + Math.random() * 600, alpha: .5 });
-      if (++sequence % 2 === 0) add({ x: x - nx * 3.4, y: y - ny * 3.4, vx: -nx * 2, vy: 3 - ny * 2, born: now, life: 2200 + Math.random() * 600, alpha: .32 });
+    let at = Math.max(untilNext, distance - 320);
+    while (at <= distance) {
+      const fraction = at / distance;
+      const angle = Math.random() * TAU;
+      const spread = 2 + Math.sqrt(Math.random()) * 16;
+      add({
+        x: previous.x + dx * fraction + Math.cos(angle) * spread + scrollX,
+        y: previous.y + dy * fraction + Math.sin(angle) * spread + 5 + scrollY,
+        // Interpolate a separate deposition time through each mouse sample.
+        // A shared lifetime makes the oldest deposits finish fading first.
+        born: previous.time + (now - previous.time) * fraction,
+        life: LIFE,
+        alpha: .3 + Math.random() * .29
+      });
+      at += nextSpacing();
     }
-    carry = (carry + distance) % SPACING;
+    untilNext = at - distance;
     previous = next;
     start();
+  }
+
+  function scroll(event) {
+    previous = null;
+    untilNext = nextSpacing();
+    hoveredCTA = null;
+    // Document scrolling preserves page-anchored deposits without creating any.
+    // A nested scroller has its own coordinate space, so discard stale deposits.
+    if (![document, window, document.documentElement, document.body].includes(event.target)) clear();
   }
 
   function pointerOver(event) {
@@ -315,8 +398,8 @@ export function initCursorTrail() {
       const tangent = (Math.random() - .5) * 16;
       const travel = 15 + Math.random() * 25;
       add({
-        x: horizontal ? rect.left + rect.width * position : (side < 0 ? rect.left - 9 : rect.right + 9),
-        y: horizontal ? (side < 0 ? rect.top - 10 : rect.bottom + 10) : rect.top + rect.height * position,
+        x: (horizontal ? rect.left + rect.width * position : (side < 0 ? rect.left - 15 : rect.right + 15)) + scrollX,
+        y: (horizontal ? (side < 0 ? rect.top - 15 : rect.bottom + 15) : rect.top + rect.height * position) + scrollY,
         vx: normalX * travel + (horizontal ? tangent : 0),
         vy: normalY * travel + (horizontal ? 0 : tangent),
         born: now, life: 720 + Math.random() * 300, alpha: .7, burst: true
@@ -340,7 +423,7 @@ export function initCursorTrail() {
   document.addEventListener('pointerover', pointerOver, { passive: true });
   document.addEventListener('pointerout', pointerOut, { passive: true });
   window.addEventListener('resize', resize, { passive: true });
-  window.addEventListener('scroll', clear, { passive: true, capture: true });
+  window.addEventListener('scroll', scroll, { passive: true, capture: true });
   window.addEventListener('blur', clear);
   document.documentElement.addEventListener('pointerleave', clear);
   document.addEventListener('visibilitychange', clear);
@@ -358,7 +441,7 @@ export function initCursorTrail() {
     document.removeEventListener('pointerover', pointerOver);
     document.removeEventListener('pointerout', pointerOut);
     window.removeEventListener('resize', resize);
-    window.removeEventListener('scroll', clear, true);
+    window.removeEventListener('scroll', scroll, true);
     window.removeEventListener('blur', clear);
     document.documentElement.removeEventListener('pointerleave', clear);
     document.removeEventListener('visibilitychange', clear);
