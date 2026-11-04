@@ -174,14 +174,24 @@ export function initPlanet(canvas) {
   function drawOrbits(front) {
     for (const orbit of orbits) {
       const path = new Path2D();
+      let previous = null;
       let connected = false;
       for (let step = 0; step <= 240; step++) {
-        const point = orbitPoint(orbit, (step / 240) * TAU);
-        if ((point.z >= 0) !== front) { connected = false; continue; }
-        const projected = project(point);
-        if (connected) path.lineTo(projected.x, projected.y);
-        else path.moveTo(projected.x, projected.y);
-        connected = true;
+        const point = orbitPoint(orbit, step / 240 * TAU);
+        if (front && previous && (previous.z >= 0) !== (point.z >= 0)) {
+          const t = previous.z / (previous.z - point.z);
+          const crossing = project({x: previous.x + (point.x - previous.x) * t, y: previous.y + (point.y - previous.y) * t, z: 0});
+          if (connected) path.lineTo(crossing.x, crossing.y);
+          else path.moveTo(crossing.x, crossing.y);
+          connected = point.z >= 0;
+        }
+        if (!front || point.z >= 0) {
+          const projected = project(point);
+          if (connected) path.lineTo(projected.x, projected.y);
+          else path.moveTo(projected.x, projected.y);
+          connected = true;
+        }
+        previous = point;
       }
       ctx.strokeStyle = `rgba(198,255,112,${orbit.alpha * (front ? 1 : 0.47)})`;
       ctx.lineWidth = front ? 0.8 : 0.65;

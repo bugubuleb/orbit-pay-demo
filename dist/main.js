@@ -6,7 +6,7 @@ import { initNetworkTicker } from './networks.js';
 import { initFinalEmblem } from './final-emblem.js';
 import { initHoverEffects } from './hover-effects.js';
 import { initPlanet } from './planet.js';
-import { calculatePayment, RATES } from './payment.js';
+import { calculatePayment, RATES, reconcileNetworks } from './payment.js';
 
 const $ = (s) => document.querySelector(s);
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -29,6 +29,21 @@ const form = $('#payment-form');
 const fields = ['#amount','#asset','#from-network','#to-network'].map($);
 const money = value => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(value);
 let currentPayment;
+let routeState = { from: fields[2].value, to: fields[3].value };
+let syncingRoute = false;
+function syncRoute(changed) {
+  if (syncingRoute) return;
+  syncingRoute = true;
+  const next = reconcileNetworks(routeState, {from: fields[2].value, to: fields[3].value}, changed);
+  for (const [index, key] of [[2, 'from'], [3, 'to']]) {
+    if (fields[index].value !== next[key]) {
+      fields[index].value = next[key];
+      fields[index].dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+  routeState = next;
+  syncingRoute = false;
+}
 function updatePayment() {
   const [amount,asset,from,to] = fields.map(f=>f.value);
   currentPayment = calculatePayment(amount,asset,from,to);
@@ -36,9 +51,19 @@ function updatePayment() {
   $('#payment-error').textContent = currentPayment.error || '';
   $('#payment-fee').textContent = currentPayment.error ? '—' : `${currentPayment.fee.toFixed(currentPayment.precision)} ${asset}`;
   $('#payment-receives').textContent = currentPayment.error ? '—' : `${currentPayment.receives.toFixed(currentPayment.precision)} ${asset}`;
+  document.querySelector('[data-route-from]').textContent = `${from} · wallet approval`;
+  document.querySelector('[data-route-to]').textContent = `${to} · recipient`;
   return !currentPayment.error;
 }
-fields.forEach(f=>f.addEventListener('input',updatePayment)); updatePayment();
+fields.forEach((field, index) => {
+  const update = () => {
+    if (index >= 2) syncRoute(index === 2 ? 'from' : 'to');
+    updatePayment();
+  };
+  field.addEventListener('input', update);
+  if (index >= 2) field.addEventListener('change', update);
+});
+updatePayment();
 let sending = false;
 const swapNetworks = $('#swap-networks');
 swapNetworks.addEventListener('click', () => {
@@ -59,7 +84,7 @@ form.addEventListener('submit',async event => {
   const button=$('#send-payment'); button.disabled=true; fields.forEach(f=>f.disabled=true);
   const phases=['Finding your orbit…','Routing through the network…','Confirming arrival…'];
   try {
-    for(const phase of phases) { button.textContent=phase; $('#payment-status').textContent=phase.toUpperCase(); $('.payment-terminal').classList.add('processing'); await new Promise(resolve=>setTimeout(resolve,reducedMotion?250:850)); }
+    for(const [index, phase] of phases.entries()) { $('.transfer-route').dataset.phase = String(index); button.textContent=phase; $('#payment-status').textContent=phase.toUpperCase(); $('.payment-terminal').classList.add('processing'); await new Promise(resolve=>setTimeout(resolve,reducedMotion?250:850)); }
     const receiptId = `ORB-DEMO-${crypto.randomUUID().slice(0,8).toUpperCase()}`;
     const stamp = new Date().toISOString();
     const receiptText = `ORBIT PAY — DEMO RECEIPT\n${receiptId}\nTime: ${stamp}\nFrom: ${payment.from}\nTo: ${payment.to}\nSent: ${payment.amount} ${payment.asset}\nFee: ${payment.fee.toFixed(payment.precision)} ${payment.asset}\nReceived: ${payment.receives.toFixed(payment.precision)} ${payment.asset}\nSimulated payment. No real funds moved.`;
@@ -68,7 +93,7 @@ form.addEventListener('submit',async event => {
     form.hidden=true;receipt.hidden=false;receipt.setAttribute('tabindex','-1');receipt.focus({preventScroll:true});
     $('#another-payment').addEventListener('click',()=>{receipt.hidden=true;form.hidden=false;$('#amount').focus({preventScroll:true});});
     $('#download-receipt').addEventListener('click',()=>{const url=URL.createObjectURL(new Blob([receiptText],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download=`${receiptId}.txt`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Demo receipt saved.');});
-  } finally {sending=false;swapNetworks.disabled=false;button.disabled=false;fields.forEach(f=>f.disabled=false);button.innerHTML='Send demo payment <span>↗</span>';$('#payment-status').innerHTML='<span class="status-dot"></span> SANDBOX MODE · NO REAL FUNDS';$('.payment-terminal').classList.remove('processing');}
+  } finally { $('.transfer-route').removeAttribute('data-phase'); sending=false;swapNetworks.disabled=false;button.disabled=false;fields.forEach(f=>f.disabled=false);button.innerHTML='Send demo payment <span>↗</span>';$('#payment-status').innerHTML='<span class="status-dot"></span> SANDBOX MODE · NO REAL FUNDS';$('.payment-terminal').classList.remove('processing');}
 });
 
 initEcosystem($('#ecosystem-root'));

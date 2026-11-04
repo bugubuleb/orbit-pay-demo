@@ -14,3 +14,8 @@ for(const asset of ['USDC','USDT','ETH'])for(const amount of [.01,.1,1,99.99,250
 assert.ok(calculatePayment(25,'BAD','Base','Ethereum').error);
 for(let i=0;i<100;i++){const p=spherePoint(i/100*Math.PI-Math.PI/2,i);assert.ok(Math.abs(p.x*p.x+p.y*p.y+p.z*p.z-1)<1e-10);const q=projectPoint(p,100,200,200);assert.ok(Number.isFinite(q.x)&&q.scale>0);}
 console.log('PASS payment validation, precision, 288 accounting scenarios and sphere projection.');
+
+const { reconcileNetworks } = await import('../dist/payment.js');
+assert.deepEqual(reconcileNetworks({from:'Ethereum',to:'Base'},{from:'Base',to:'Base'},'from'),{from:'Base',to:'Ethereum'});
+assert.deepEqual(reconcileNetworks({from:'Ethereum',to:'Base'},{from:'Ethereum',to:'Ethereum'},'to'),{from:'Base',to:'Ethereum'});
+assert.deepEqual(reconcileNetworks({from:'Base',to:'Ethereum'},{from:'Solana',to:'Ethereum'},'from'),{from:'Solana',to:'Ethereum'});

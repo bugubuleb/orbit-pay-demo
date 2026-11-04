@@ -115,7 +115,7 @@ export function initFinalEmblem(root) {
       ${globeGrid()}
     </g>
     <g transform="rotate(-35 70 70)" clip-path="url(#${id}-front)">
-      <ellipse cx="70" cy="70" rx="61" ry="23" fill="none" stroke="var(--lime, #bcff75)" stroke-width="10"/>
+
       <g fill="currentColor" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">${rows}</g>
     </g>
     <g transform="rotate(-35 70 70)">

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { initCursorTrail } from '../dist/cursor-trail.js';
+import { initCursorTrail, trailOpacity } from '../dist/cursor-trail.js';
 import { initPlanet, getPlanetTrailGeometry } from '../dist/planet.js';
 
 // A deterministic clock verifies work scheduling and lifecycle contracts. Real
@@ -49,9 +49,14 @@ const step = time => {now=time;const pending=[...frames.values()];frames.clear()
 const pointer = (x,y=220,target=node()) => globalThis.emit('pointermove',{pointerType:'mouse',clientX:x,clientY:y,target});
 function deposit() { pointer(100);now+=40;pointer(210);step(now+16); }
 
+assert.ok(trailOpacity(2200) < trailOpacity(1500), 'older segments fade before newer ones');
+assert.equal(trailOpacity(2650), 0);
+assert.ok(trailOpacity(1900)>0, 'a later segment survives after an earlier segment expires');
 let trail=initCursorTrail();
 deposit();
 assert.ok(glyphDraws>0,'moving in empty space draws glyphs');
+globalThis.emit('blur');
+assert.ok(frames.size>0, 'losing window focus must not erase the entire line');
 const firstReads=reads;
 for(let i=0;i<30;i++) step(now+16);
 assert.equal(reads,firstReads,'stationary layout must not be scanned again on every fade frame');

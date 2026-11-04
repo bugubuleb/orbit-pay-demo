@@ -150,7 +150,7 @@ function instrument(id) {
         ${continentDots()}
         <circle cx="345" cy="277" r="63" fill="url(#${id}-limb)"/>
       </g>
-      <path d="M286 258a63 63 0 0 1 72-43" stroke="#c5e6a1" stroke-opacity=".38" stroke-width=".9" stroke-linecap="round"/>
+
       ${ring.front}
     </g>
     <g class="eco-svg-labels" fill="#6e825e" font-size="9" letter-spacing="1.6">

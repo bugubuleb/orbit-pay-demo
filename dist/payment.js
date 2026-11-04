@@ -13,3 +13,9 @@ export function calculatePayment(rawAmount, asset, from, to) {
   if (receives <= 0) return { error: 'This amount is too small to cover the network fee.' };
   return { amount, asset, from, to, fee, receives, precision, usd: amount * RATES[asset] };
 }
+
+/** Keep a cross-network route distinct when one endpoint replaces the other. */
+export function reconcileNetworks(previous, next, changed) {
+  if (next.from !== next.to) return next;
+  return changed === 'from' ? { from: next.from, to: previous.from } : { from: previous.to, to: next.to };
+}

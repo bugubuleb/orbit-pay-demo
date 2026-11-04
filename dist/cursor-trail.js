@@ -10,6 +10,10 @@ const BURST_TARGETS = '.eco-cta,.earn-submit,#send-payment,.hero-actions .button
 const SVG_PAINT = 'svg path,svg circle,svg ellipse,svg rect,svg line,svg polyline,svg polygon,svg text,svg image,svg use';
 const GLYPHS = '0123456789abcdef';
 const LIFE = 2650;
+export function trailOpacity(ageMs, life = LIFE) {
+  const fade = Math.max(0, Math.min(1, (ageMs - life * .45) / (life * .55)));
+  return 1 - fade * fade * (3 - 2 * fade);
+}
 const CLEARANCE = 18;
 const GRID = 96;
 const nextSpacing = () => 2.2 + Math.random() * 2.8;
@@ -404,7 +408,7 @@ export function initCursorTrail() {
       if (x < -20 || x > width + 20 || y < -20 || y > height + 20) continue;
       const clearance = proximity(x, y, p.size);
       if (!clearance) continue;
-      target.globalAlpha = p.alpha * Math.pow(1 - age, p.burst ? 1.7 : 1.35) * clearance;
+      target.globalAlpha = p.alpha * (p.burst ? Math.pow(1 - age, 1.7) : trailOpacity(now - p.born, p.life)) * clearance;
       const row = lightRects.some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? 1 : 0;
       const side = atlasCell / atlasScale * p.size / 9;
       target.save();
@@ -589,9 +593,10 @@ export function initCursorTrail() {
   document.addEventListener('pointerout', pointerOut, { passive: true });
   window.addEventListener('resize', resize, { passive: true });
   window.addEventListener('scroll', resetPointer, { passive: true, capture: true });
-  window.addEventListener('blur', clear);
+  window.addEventListener('blur', resetPointer);
   document.documentElement.addEventListener('pointerleave', resetPointer);
-  document.addEventListener('visibilitychange', clear);
+  const onVisibility = () => { resetPointer(); if (document.hidden) { cancelAnimationFrame(frame); frame = 0; } else start(); };
+  document.addEventListener('visibilitychange', onVisibility);
   finePointer.addEventListener('change', resize);
   reducedMotion.addEventListener('change', resize);
   const fontsReady = () => { if (!destroyed) { paintGlyphAtlas(); invalidate(true); } };
@@ -611,9 +616,9 @@ export function initCursorTrail() {
     document.removeEventListener('pointerout', pointerOut);
     window.removeEventListener('resize', resize);
     window.removeEventListener('scroll', resetPointer, true);
-    window.removeEventListener('blur', clear);
+    window.removeEventListener('blur', resetPointer);
     document.documentElement.removeEventListener('pointerleave', resetPointer);
-    document.removeEventListener('visibilitychange', clear);
+    document.removeEventListener('visibilitychange', onVisibility);
     finePointer.removeEventListener('change', resize);
     reducedMotion.removeEventListener('change', resize);
     document.fonts?.removeEventListener('loadingdone', fontsReady);
