@@ -1,0 +1,194 @@
+const ICONS = {
+  wallet: '<path d="M20 9.5V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5" fill="currentColor" fill-opacity=".07"/><path d="M20 9.5h-3a3 3 0 0 0 0 6h3v-6Z" fill="currentColor" fill-opacity=".18"/><path d="M7 8h6" opacity=".45"/><circle cx="17" cy="12.5" r=".7" fill="currentColor" stroke="none"/>',
+  pay: '<path d="M4.5 7.5h15m-4-4 4 4-4 4M19.5 16.5h-15m4-4-4 4 4 4"/>',
+  stake: '<path d="m12 2.75 6 9-6 3.5-6-3.5 6-9Z" fill="currentColor" fill-opacity=".08"/><path d="m12 2.75 6 9-6 3.5V2.75Z" fill="currentColor" fill-opacity=".3" stroke="none"/><path d="m6.4 16.5 5.6 4.75 5.6-4.75"/>',
+};
+
+const icon = (name, className = '') => `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+
+const PRODUCTS = {
+  wallet: {
+    number: '01', name: 'Wallet', channel: 'HOLD', title: 'A home for every asset.',
+    description: 'Your balances, beautifully in view. Keep your digital dollars and your next move together.',
+    cta: 'Take the wallet for a spin', href: '#product',
+    preview: `<div class="eco-card-heading"><span>YOUR PORTFOLIO</span><span class="eco-demo-label">DEMO</span></div>
+      <div class="eco-balance"><span class="eco-value">$12,840<span>.00</span></span><span class="eco-balance-note">Total balance · USD</span></div>
+      <div class="eco-asset-list">
+        <div class="eco-asset"><span class="eco-coin eco-usdc" aria-hidden="true">$</span><span class="eco-asset-name"><b>USD Coin</b><small>6,800.00 USDC</small></span><span class="eco-asset-value">$6,800.00<small>Digital dollars</small></span></div>
+        <div class="eco-asset"><span class="eco-coin eco-eth">${icon('stake')}</span><span class="eco-asset-name"><b>Ethereum</b><small>2.0480 ETH</small></span><span class="eco-asset-value">$5,120.00<small>Ethereum</small></span></div>
+        <div class="eco-asset"><span class="eco-coin eco-sol" aria-hidden="true"><i></i><i></i><i></i></span><span class="eco-asset-name"><b>Solana</b><small>6.5714 SOL</small></span><span class="eco-asset-value">$920.00<small>Solana</small></span></div>
+      </div><div class="eco-card-foot"><span class="eco-tiny-dot"></span> One view. All your possibilities.</div>`,
+  },
+  pay: {
+    number: '02', name: 'Pay', channel: 'MOVE', title: 'A little closer. Instantly.',
+    description: 'For a friend, a freelancer, or your next big thing. Move digital dollars across networks in a few taps.',
+    cta: 'Try a demo payment', href: '#product',
+    preview: `<div class="eco-card-heading"><span>PAYMENT RECEIPT</span><span class="eco-demo-label">DEMO</span></div>
+      <div class="eco-payment-amount"><span class="eco-value">$250<span>.00</span></span><span class="eco-confirmed"><span aria-hidden="true">✓</span> Delivered</span></div>
+      <div class="eco-recipient"><span class="eco-recipient-icon" aria-hidden="true">✳</span><span><small>Paid to</small><b>Orbit Studio</b></span><span class="eco-recipient-asset">USDC</span></div>
+      <div class="eco-receipt-route"><span><i></i> Ethereum</span><span class="eco-route-arrow" aria-hidden="true">⟶</span><span><i></i> Base</span></div>
+      <dl class="eco-receipt-lines"><div><dt>Network fee</dt><dd>0.45 USDC</dd></div><div><dt>Arrival time</dt><dd>~3 seconds</dd></div></dl>
+      <div class="eco-card-foot"><span class="eco-tiny-dot"></span> A simulated transfer. No funds moved.</div>`,
+  },
+  stake: {
+    number: '03', name: 'Stake', channel: 'GROW', title: 'Give your ETH a purpose.',
+    description: 'Explore staking with a clear view of your position, rewards, and the way it all works.',
+    cta: 'Explore the staking demo', href: '#earn',
+    preview: `<div class="eco-card-heading"><span>ETHEREUM STAKING</span><span class="eco-demo-label">DEMO</span></div>
+      <div class="eco-yield"><span class="eco-value">6.8<span>%</span></span><span class="eco-yield-label">Illustrative APY<br><small>Not a live rate</small></span></div>
+      <div class="eco-stake-chart" aria-hidden="true"><svg viewBox="0 0 350 66" preserveAspectRatio="none"><path d="M0 50H350M0 24H350" fill="none" stroke="#23331e" stroke-dasharray="2 5"/><path d="m0 58 28-4 22 2 27-12 25 4 30-10 23 2 30-10 29 3 28-15 27 4 29-12 25 4 27-11" fill="none" stroke="#bcff75" stroke-width="2"/><circle cx="350" cy="3" r="3" fill="#bcff75"/></svg><span>ILLUSTRATIVE REWARD CURVE</span></div>
+      <dl class="eco-stake-lines"><div><dt>Your demo position</dt><dd>2.4000 <span>ETH</span></dd></div><div><dt>Demo annual rewards</dt><dd class="eco-lime">+0.1632 <span>ETH</span></dd></div></dl>
+      <div class="eco-card-foot"><span class="eco-tiny-dot"></span> Example only. Actual rewards can vary.</div>`,
+  },
+};
+
+function instrument(id) {
+  const ticks = Array.from({ length: 72 }, (_, index) => {
+    const angle = index * Math.PI / 36;
+    const major = index % 6 === 0;
+    const inner = major ? 207 : 211;
+    return `<path d="M${(345 + Math.cos(angle) * inner).toFixed(2)} ${(277 + Math.sin(angle) * inner).toFixed(2)} ${ (345 + Math.cos(angle) * 215).toFixed(2)} ${(277 + Math.sin(angle) * 215).toFixed(2)}" opacity="${major ? '.75' : '.3'}"/>`;
+  }).join('');
+  return `<svg class="eco-instrument" viewBox="0 0 700 570" fill="none" aria-hidden="true">
+    <defs>
+      <radialGradient id="${id}-aura"><stop stop-color="#9cda6a" stop-opacity=".12"/><stop offset=".68" stop-color="#7faf53" stop-opacity=".025"/><stop offset="1" stop-color="#7faf53" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}-sphere" cx=".27" cy=".22" r=".9"><stop stop-color="#536c3e"/><stop offset=".28" stop-color="#304224"/><stop offset=".6" stop-color="#172110"/><stop offset="1" stop-color="#080c07"/></radialGradient>
+      <radialGradient id="${id}-limb" cx=".3" cy=".25" r=".78"><stop offset=".55" stop-color="#0a1007" stop-opacity="0"/><stop offset="1" stop-color="#040703" stop-opacity=".8"/></radialGradient>
+      <linearGradient id="${id}-metal" x1="240" y1="330" x2="423" y2="210" gradientUnits="userSpaceOnUse"><stop stop-color="#425e30"/><stop offset=".28" stop-color="#b8f985"/><stop offset=".55" stop-color="#e7ffbe"/><stop offset=".8" stop-color="#6b994b"/><stop offset="1" stop-color="#2c4021"/></linearGradient>
+      <linearGradient id="${id}-orbit" x1="100" y1="100" x2="600" y2="460" gradientUnits="userSpaceOnUse"><stop stop-color="#badb96" stop-opacity=".5"/><stop offset=".4" stop-color="#91b46c" stop-opacity=".1"/><stop offset="1" stop-color="#a7d280" stop-opacity=".45"/></linearGradient>
+      <pattern id="${id}-grid" width="42" height="42" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".8" fill="#b7db92" opacity=".13"/></pattern>
+      <clipPath id="${id}-surface"><circle cx="345" cy="277" r="62.6"/></clipPath>
+    </defs>
+    <rect x="26" y="30" width="648" height="496" fill="url(#${id}-grid)"/>
+    <ellipse cx="345" cy="277" rx="267" ry="240" fill="url(#${id}-aura)"/>
+    <g stroke="#5c7547" stroke-width=".7">${ticks}</g>
+    <g class="eco-orbital-tracks" stroke="url(#${id}-orbit)">
+      <ellipse cx="345" cy="277" rx="270" ry="170" transform="rotate(-23 345 277)" stroke-width="7" opacity=".06"/>
+      <ellipse cx="345" cy="277" rx="270" ry="170" transform="rotate(-23 345 277)"/>
+    </g>
+    <ellipse class="eco-orbit-tracer" cx="345" cy="277" rx="270" ry="170" transform="rotate(-23 345 277)" pathLength="1000" stroke="#bcff75" stroke-width="2" stroke-linecap="round" stroke-dasharray="7 993" opacity=".65"/>
+    <g class="eco-connectors" stroke="#bcff75" stroke-width="1.25" stroke-linecap="round">
+      <path data-eco-route="wallet" d="M283 261C241 251 200 222 151 207"/>
+      <path data-eco-route="pay" d="M408 270C477 270 545 251 602 232"/>
+      <path data-eco-route="stake" d="M350 340C350 379 359 415 367 449"/>
+    </g>
+    <g class="eco-route-endpoints" fill="#bcff75"><circle cx="283" cy="261" r="2.5" data-eco-route="wallet"/><circle cx="408" cy="270" r="2.5" data-eco-route="pay"/><circle cx="350" cy="340" r="2.5" data-eco-route="stake"/></g>
+    <g class="eco-sculpture">
+      <ellipse cx="345" cy="277" rx="101" ry="35" transform="rotate(-34 345 277)" stroke="#304524" stroke-width="15"/>
+      <ellipse cx="345" cy="277" rx="101" ry="35" transform="rotate(-34 345 277)" stroke="#badc98" stroke-width=".7"/>
+      <circle cx="345" cy="277" r="63" fill="url(#${id}-sphere)" stroke="#8ab164" stroke-opacity=".4" stroke-width=".8"/>
+      <g clip-path="url(#${id}-surface)">
+        <g transform="rotate(-18 345 277)" stroke="#b6d693" stroke-linecap="round">
+          <path d="M285 231c32 17 79 19 119 5M275 252c40 19 93 22 139 7M279 282c40 18 92 19 132 4M291 313c32 11 65 11 98 2" stroke-width="4" opacity=".055"/>
+          <path d="M291 226c29 17 66 19 102 7M280 241c36 19 81 21 124 8M276 254c40 19 92 22 137 6M277 267c40 19 94 22 137 5M281 284c40 17 88 18 128 2M286 298c36 15 79 16 116 2M297 316c28 9 58 10 86 1" stroke-width=".65" opacity=".23"/>
+          <path d="M281 260c13 4 17 9 29 9s17-4 28-1 15 8 29 8 29-3 43-8M288 291c16 7 22 3 33 7s20 9 32 7 29-1 46-7M296 239c12 6 18 3 28 7s19 5 27 4 24 5 41 0" stroke-width=".7" opacity=".17"/>
+          <path d="M318 216c-27 34-30 81 7 121M354 212c29 29 35 80 12 126" stroke-width=".55" opacity=".11"/>
+        </g>
+        <g fill="#d9edba" opacity=".19"><circle cx="316" cy="233" r=".7"/><circle cx="331" cy="226" r=".5"/><circle cx="304" cy="250" r=".6"/><circle cx="339" cy="244" r=".5"/><circle cx="322" cy="263" r=".7"/><circle cx="298" cy="274" r=".4"/><circle cx="355" cy="234" r=".5"/><circle cx="368" cy="253" r=".7"/><circle cx="338" cy="291" r=".5"/><circle cx="317" cy="302" r=".6"/><circle cx="379" cy="279" r=".5"/></g>
+        <circle cx="345" cy="277" r="63" fill="url(#${id}-limb)"/>
+      </g>
+      <path d="M286 258a63 63 0 0 1 72-43" stroke="#c5e6a1" stroke-opacity=".38" stroke-width=".9" stroke-linecap="round"/>
+      <path d="M244 277a101 35 0 0 0 202 0" transform="rotate(-34 345 277)" stroke="url(#${id}-metal)" stroke-width="15"/>
+      <path d="M244 277a101 35 0 0 0 202 0" transform="rotate(-34 345 277)" stroke="#2e4720" stroke-opacity=".35" stroke-width="1.3"/>
+      <path d="M244 277a101 35 0 0 0 202 0" transform="rotate(-34 345 277) translate(0 -5)" stroke="#deffb5" stroke-opacity=".4" stroke-width=".7"/>
+    </g>
+    <g class="eco-svg-labels" fill="#6e825e" font-size="9" letter-spacing="1.6">
+      <text x="38" y="71">ORBITAL SYSTEM / 003</text><text x="563" y="71">360° / OPEN</text>
+      <text x="67" y="377" transform="rotate(-90 67 377)">YOUR FINANCIAL FIELD</text>
+      <text x="345" y="383" text-anchor="middle" fill="#a1b58a" font-size="10" letter-spacing="3.3">O R B I T</text>
+      <text x="345" y="400" text-anchor="middle" font-size="7.8" letter-spacing="1.3">PERSONAL FINANCE</text>
+    </g>
+  </svg>`;
+}
+
+let instanceCount = 0;
+
+/** Mount the self-contained Wallet / Pay / Stake orbital product explorer. */
+export function initEcosystem(root) {
+  if (!root) return null;
+  root._orbitEcosystem?.destroy();
+  const id = `eco-${++instanceCount}`;
+  const keys = Object.keys(PRODUCTS);
+  root.innerHTML = `<div class="eco-v2 is-paused" data-eco-selected="wallet">
+    <div class="eco-map-column">
+      <div class="eco-map-top"><span><i class="eco-tiny-dot"></i> ONE ACCOUNT. THREE POSSIBILITIES.</span><span class="eco-channel">01 / HOLD</span></div>
+      <div class="eco-map" role="group" aria-label="Explore Wallet, Pay and Stake">
+        ${instrument(id)}
+        ${keys.map(key => `<button type="button" class="eco-node eco-node-${key}" data-eco-product="${key}" aria-pressed="${key === 'wallet'}" aria-controls="${id}-detail"><span class="eco-node-orb">${icon(key)}<span class="eco-node-point"></span></span><span class="eco-node-label">${PRODUCTS[key].name}<small>0${keys.indexOf(key) + 1} / ${PRODUCTS[key].channel}</small></span></button>`).join('')}
+      </div>
+      <div class="eco-map-bottom"><span>CHOOSE YOUR NEXT MOVE</span><span class="eco-map-progress"><i class="is-active"></i><i></i><i></i><span>01—03</span></span></div>
+    </div>
+    <div id="${id}-detail" class="eco-detail" role="region" aria-label="Wallet preview" aria-live="polite"></div>
+  </div>`;
+  const shell = root.querySelector('.eco-v2');
+  const detail = root.querySelector('.eco-detail');
+  const buttons = [...root.querySelectorAll('[data-eco-product]')];
+  let selected;
+  let visible = false;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  function selectProduct(key) {
+    const product = PRODUCTS[key];
+    if (!product || key === selected) return;
+    selected = key;
+    shell.dataset.ecoSelected = key;
+    buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.ecoProduct === key)));
+    root.querySelector('.eco-channel').textContent = `${product.number} / ${product.channel}`;
+    root.querySelectorAll('.eco-map-progress > i').forEach((dot, index) => dot.classList.toggle('is-active', keys[index] === key));
+    root.querySelector('.eco-map-progress > span').textContent = `${product.number}—03`;
+    root.querySelectorAll('[data-eco-route]').forEach(path => path.classList.toggle('is-active', path.dataset.ecoRoute === key));
+    detail.setAttribute('aria-label', `${product.name} preview`);
+    detail.innerHTML = `<div class="eco-detail-label"><span>ORBIT ${product.name.toUpperCase()}</span><span>${product.number} / 03</span></div><h3>${product.title}</h3><p class="eco-detail-description">${product.description}</p><div class="eco-preview eco-preview-${key}">${product.preview}</div><a class="eco-cta" href="${product.href}">${product.cta}<span aria-hidden="true">↗</span></a><span class="eco-disclosure">FICTIONAL PRODUCT · ILLUSTRATIVE DATA</span>`;
+  }
+
+  function handleClick(event) {
+    const button = event.target.closest('[data-eco-product]');
+    if (button && root.contains(button)) selectProduct(button.dataset.ecoProduct);
+  }
+
+  function handleKeys(event) {
+    const button = event.target.closest('[data-eco-product]');
+    if (!button) return;
+    const index = buttons.indexOf(button);
+    let next;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % buttons.length;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index + buttons.length - 1) % buttons.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = buttons.length - 1;
+    if (next === undefined) return;
+    event.preventDefault();
+    buttons[next].focus({ preventScroll: true });
+    selectProduct(buttons[next].dataset.ecoProduct);
+  }
+
+  function updateMotion() {
+    shell.classList.toggle('is-paused', !visible || reducedMotion.matches || document.hidden);
+  }
+
+  root.addEventListener('click', handleClick);
+  root.addEventListener('keydown', handleKeys);
+  document.addEventListener('visibilitychange', updateMotion);
+  reducedMotion.addEventListener('change', updateMotion);
+  const observer = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    visible = entries.some(entry => entry.isIntersecting);
+    updateMotion();
+  }, { threshold: 0.05 }) : null;
+  if (observer) observer.observe(root);
+  else { visible = true; updateMotion(); }
+  selectProduct('wallet');
+
+  const controller = {
+    selectProduct,
+    destroy() {
+      observer?.disconnect();
+      root.removeEventListener('click', handleClick);
+      root.removeEventListener('keydown', handleKeys);
+      document.removeEventListener('visibilitychange', updateMotion);
+      reducedMotion.removeEventListener('change', updateMotion);
+      shell.classList.add('is-paused');
+      if (root._orbitEcosystem === controller) delete root._orbitEcosystem;
+    },
+  };
+  root._orbitEcosystem = controller;
+  return controller;
+}

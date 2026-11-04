@@ -1,0 +1,12 @@
+{
+  "name": "orbit-pay",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ORBIT PAY \u2014 an interactive fictional crypto payment ecosystem",
+  "scripts": {
+    "dev": "node serve.mjs",
+    "start": "node serve.mjs",
+    "test": "node tests/payment.mjs && node tests/earn.mjs && node tests/arcade.mjs"
+  }
+}
