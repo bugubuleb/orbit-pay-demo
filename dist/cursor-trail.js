@@ -9,9 +9,9 @@ const IGNORE_TEXT = `${FOREGROUND},script,style,template,svg,canvas,.sr-only`;
 const BURST_TARGETS = '.eco-cta,.earn-submit,#send-payment,.hero-actions .button';
 const SVG_PAINT = 'svg path,svg circle,svg ellipse,svg rect,svg line,svg polyline,svg polygon,svg text,svg image,svg use';
 const GLYPHS = '0123456789abcdef';
-const LIFE = 2650;
+const LIFE = 2300;
 export function trailOpacity(ageMs, life = LIFE) {
-  const fade = Math.max(0, Math.min(1, (ageMs - life * .45) / (life * .55)));
+  const fade = Math.max(0, Math.min(1, (ageMs - life * .2) / (life * .8)));
   return 1 - fade * fade * (3 - 2 * fade);
 }
 const CLEARANCE = 18;
@@ -401,7 +401,7 @@ export function initCursorTrail() {
     for (const p of list) {
       const age = Math.max(0, (now - p.born) / p.life);
       // Only deliberate CTA bursts move. Ordinary ink keeps its original page
-      // coordinate, angle and size throughout its individual 2650ms lifetime.
+      // coordinate, angle and size throughout its individual 2300ms lifetime.
       const travel = p.burst ? 1 - Math.pow(1 - age, 3) : 0;
       const x = p.x - pageX + (p.burst ? p.vx * travel : 0);
       const y = p.y - pageY + (p.burst ? p.vy * travel : 0);

@@ -30,12 +30,12 @@ function ringRow(pathId, count, seed, length) {
 }
 
 function project(x, y, z) {
-  const tilt = 22 * Math.PI / 180;
-  const turn = -12 * Math.PI / 180;
+  const tilt = 12 * Math.PI / 180;
+  const turn = -5 * Math.PI / 180;
   const tiltedY = y * Math.cos(tilt) - z * Math.sin(tilt);
   return {
-    x: 70 + 31 * (x * Math.cos(turn) - tiltedY * Math.sin(turn)),
-    y: 70 + 31 * (x * Math.sin(turn) + tiltedY * Math.cos(turn)),
+    x: 70 + 39 * (x * Math.cos(turn) - tiltedY * Math.sin(turn)),
+    y: 70 + 39 * (x * Math.sin(turn) + tiltedY * Math.cos(turn)),
     z: y * Math.sin(tilt) + z * Math.cos(tilt),
   };
 }
@@ -87,8 +87,8 @@ export function initFinalEmblem(root) {
   const id = `orbit-closing-mark-${++nextEmblemId}`;
   const outer = `${id}-outer`;
   const inner = `${id}-inner`;
-  const rows = ringRow(outer, 106, 12387, ellipseLength(63, 25.5))
-    + ringRow(inner, 98, 43569, ellipseLength(59, 20.5));
+  const rows = ringRow(outer, 106, 12387, ellipseLength(67, 31.5))
+    + ringRow(inner, 98, 43569, ellipseLength(63, 27.5));
 
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
@@ -96,30 +96,30 @@ export function initFinalEmblem(root) {
   root.setAttribute('data-trail-obstacle', '');
   svg.innerHTML = `
     <defs>
-      <path id="${outer}" d="M7 70a63 25.5 0 1 1 126 0a63 25.5 0 1 1-126 0"/>
-      <path id="${inner}" d="M11 70a59 20.5 0 1 1 118 0a59 20.5 0 1 1-118 0"/>
-      <clipPath id="${id}-globe"><circle cx="70" cy="70" r="30.6"/></clipPath>
+      <path id="${outer}" d="M3 70a67 31.5 0 1 1 134 0a67 31.5 0 1 1-134 0"/>
+      <path id="${inner}" d="M7 70a63 27.5 0 1 1 126 0a63 27.5 0 1 1-126 0"/>
+      <clipPath id="${id}-globe"><circle cx="70" cy="70" r="38.6"/></clipPath>
       <clipPath id="${id}-front"><path d="M0 70h140v70H0Z"/></clipPath>
     </defs>
-    <g fill="currentColor" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" transform="rotate(-35 70 70)">
+    <g fill="currentColor" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" transform="rotate(-15 70 70)">
       ${rows}
     </g>
-    <g transform="rotate(-35 70 70)">
-      <g class="final-satellite-back" transform="translate(70 47)">
+    <g transform="rotate(-15 70 70)">
+      <g class="final-satellite-back" transform="translate(70 40.5)">
         <circle r="7" fill="currentColor"/>
         <circle r="2.5" fill="var(--lime, #bcff75)"/>
       </g>
     </g>
-    <circle cx="70" cy="70" r="31" fill="var(--lime, #bcff75)" stroke="currentColor" stroke-width="2.3"/>
+    <circle cx="70" cy="70" r="39" fill="var(--lime, #bcff75)" stroke="currentColor" stroke-width="2.3"/>
     <g fill="none" stroke="currentColor" stroke-linecap="round" clip-path="url(#${id}-globe)">
       ${globeGrid()}
     </g>
-    <g transform="rotate(-35 70 70)" clip-path="url(#${id}-front)">
+    <g transform="rotate(-15 70 70)" clip-path="url(#${id}-front)">
 
       <g fill="currentColor" font-family="ui-monospace, SFMono-Regular, Consolas, monospace">${rows}</g>
     </g>
-    <g transform="rotate(-35 70 70)">
-      <g class="final-satellite-front" transform="translate(70 47)" visibility="hidden">
+    <g transform="rotate(-15 70 70)">
+      <g class="final-satellite-front" transform="translate(70 40.5)" visibility="hidden">
         <circle r="7" fill="currentColor"/>
         <circle r="2.5" fill="var(--lime, #bcff75)"/>
       </g>
@@ -142,8 +142,8 @@ export function initFinalEmblem(root) {
     // Use the middle of the two hex rows. The upper half is behind the opaque
     // globe; at rest the complete satellite fits behind its northern edge.
     const angle = -Math.PI / 2 + progress * TAU;
-    const x = round(70 + Math.cos(angle) * 61);
-    const y = round(70 + Math.sin(angle) * 23);
+    const x = round(70 + Math.cos(angle) * 65);
+    const y = round(70 + Math.sin(angle) * 29.5);
     const inFront = Math.sin(angle) >= 0;
     for (const satellite of [rear, front]) {
       satellite.setAttribute('transform', `translate(${x} ${y})`);

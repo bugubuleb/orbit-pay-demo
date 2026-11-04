@@ -50,7 +50,7 @@ const pointer = (x,y=220,target=node()) => globalThis.emit('pointermove',{pointe
 function deposit() { pointer(100);now+=40;pointer(210);step(now+16); }
 
 assert.ok(trailOpacity(2200) < trailOpacity(1500), 'older segments fade before newer ones');
-assert.equal(trailOpacity(2650), 0);
+assert.equal(trailOpacity(2300), 0);
 assert.ok(trailOpacity(1900)>0, 'a later segment survives after an earlier segment expires');
 let trail=initCursorTrail();
 deposit();

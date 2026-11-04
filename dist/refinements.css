@@ -40,3 +40,7 @@
 .final-section .final-emblem{align-self:center;margin:0;transform:none}
 @media(max-width:700px){.final-lockup{grid-template-columns:minmax(0,1fr) clamp(140px,32vw,230px);gap:12px}.final-section .final-lockup h2{font-size:clamp(45px,8.5vw,80px)}}
 @media(max-width:440px){.final-lockup{grid-template-columns:1fr}.final-section .final-emblem{width:min(68vw,260px);justify-self:end;margin-top:-15px}.final-section .final-lockup h2{font-size:clamp(54px,15vw,70px)}.route-steps{gap:8px}.transfer-route .route-steps strong{font-size:11px}.route-steps small{font-size:8px}}
+
+.final-lockup{grid-template-columns:minmax(0,1fr) clamp(190px,33vw,460px)}
+@media(max-width:700px){.final-lockup{grid-template-columns:minmax(0,1fr) clamp(155px,35vw,250px)}}
+@media(max-width:440px){.final-lockup{grid-template-columns:1fr}.final-section .final-emblem{width:min(76vw,290px)}}

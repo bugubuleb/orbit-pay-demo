@@ -46,32 +46,23 @@ const PRODUCTS = {
 // supply its texture without a solid band or thousands of individual nodes.
 function hexadecimalRing(id) {
   const paths = [];
-  const halves = { back: [], front: [] };
-  for (const [halfIndex, half] of ['back', 'front'].entries()) {
-    for (let row = 0; row < 10; row += 1) {
-      const offset = (row - 4.5) * 1.42;
-      const rx = 101 + offset;
-      const ry = 35 + offset;
-      const length = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry))) / 2;
-      const pathId = `${id}-hex-${half}-${row}`;
-      paths.push(`<path id="${pathId}" d="M${(345 - rx).toFixed(2)} 277a${rx.toFixed(2)} ${ry.toFixed(2)} 0 0 ${half === 'back' ? 1 : 0} ${(rx * 2).toFixed(2)} 0"/>`);
-      let seed = 0x6a09e667 ^ (row * 0x45d9f3b) ^ (halfIndex * 0x27d4eb2d);
-      let glyphs = '';
-      for (let index = 0; index < Math.floor(length / 1.12); index += 1) {
-        seed ^= seed << 13;
-        seed ^= seed >>> 17;
-        seed ^= seed << 5;
-        glyphs += '0123456789ABCDEF'[(seed >>> 16) & 15];
-      }
-      const opacity = (half === 'front' ? .68 : .4) + (row % 3) * .1;
-      halves[half].push(`<text fill="${row % 3 === 1 ? '#ddffad' : '#bcff75'}" opacity="${opacity.toFixed(2)}" textLength="${(length - 1.1).toFixed(2)}" lengthAdjust="spacingAndGlyphs"><textPath href="#${pathId}" startOffset=".25%">${glyphs}</textPath></text>`);
+  const rows = [];
+  for (let row = 0; row < 10; row++) {
+    const offset = (row - 4.5) * 1.42;
+    const rx = 101 + offset, ry = 35 + offset;
+    const length = Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+    const pathId = `${id}-hex-row-${row}`;
+    paths.push(`<path id="${pathId}" d="M${345-rx} 277a${rx} ${ry} 0 1 1 ${rx*2} 0a${rx} ${ry} 0 1 1 ${-rx*2} 0"/>`);
+    let seed = 0x6a09e667 ^ (row * 0x45d9f3b), glyphs = '';
+    for (let index = 0; index < Math.floor(length / 1.12); index++) {
+      seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
+      glyphs += '0123456789ABCDEF'[(seed >>> 16) & 15];
     }
+    rows.push(`<text fill="${row % 3 === 1 ? '#ddffad' : '#bcff75'}" opacity="${.68+(row%3)*.07}"><textPath href="#${pathId}" startOffset="0" textLength="${length}" lengthAdjust="spacingAndGlyphs">${glyphs}</textPath></text>`);
   }
-  return {
-    paths: paths.join(''),
-    back: `<g class="eco-hex-ring eco-hex-ring-back" transform="rotate(34 345 277)">${halves.back.join('')}</g>`,
-    front: `<g class="eco-hex-ring eco-hex-ring-front" transform="rotate(34 345 277)">${halves.front.join('')}</g>`,
-  };
+  paths.push(`<clipPath id="${id}-ring-back"><path d="M0 0h700v277H0Z"/></clipPath><clipPath id="${id}-ring-front"><path d="M0 277h700v293H0Z"/></clipPath>`);
+  const layer = half => `<g class="eco-hex-ring eco-hex-ring-${half}" transform="rotate(34 345 277)"><g clip-path="url(#${id}-ring-${half})">${rows.join('')}</g></g>`;
+  return { paths: paths.join(''), back: layer('back'), front: layer('front') };
 }
 
 function continentDots() {
