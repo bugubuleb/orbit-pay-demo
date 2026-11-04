@@ -1,0 +1,25 @@
+/* A closer editorial rhythm, with small deliberate hover responses. */
+#product{padding-bottom:46px}
+#ecosystem{padding-top:46px}
+#ecosystem + #earn{padding-top:34px}
+#earn{padding-bottom:46px}
+.business-section{padding-top:46px;padding-bottom:46px}
+#developers{padding-top:46px;padding-bottom:52px}
+.earn-layout{padding-top:30px}
+.developer-layout{padding-top:28px}
+.business-section>h2{margin-top:32px;margin-bottom:32px}
+.business-section>h2 .serif-word{letter-spacing:-.035em;word-spacing:.04em}
+#copy-code .copy-label{font:inherit;margin:0}
+#copy-code .copy-icon{width:18px;height:18px;flex:none;overflow:visible}
+.copy-icon rect{fill:#10150f;stroke:currentColor;stroke-width:1.15;transform-box:fill-box;transform-origin:center}
+@media(max-width:760px){
+  #product{padding-bottom:34px}
+  #ecosystem{padding-top:34px}
+  #ecosystem + #earn{padding-top:28px}
+  #earn{padding-bottom:34px}
+  .business-section{padding-top:34px;padding-bottom:34px}
+  #developers{padding-top:34px;padding-bottom:38px}
+  .earn-layout{padding-top:20px}
+  .developer-layout{padding-top:12px}
+  .business-section>h2{margin-top:26px;margin-bottom:30px}
+}

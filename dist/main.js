@@ -3,6 +3,8 @@ import { initEcosystem } from './ecosystem.js';
 import { initEarn } from './earn.js';
 import { initCursorTrail } from './cursor-trail.js';
 import { initNetworkTicker } from './networks.js';
+import { initFinalEmblem } from './final-emblem.js';
+import { initHoverEffects } from './hover-effects.js';
 import { initPlanet } from './planet.js';
 import { calculatePayment, RATES } from './payment.js';
 
@@ -60,6 +62,8 @@ form.addEventListener('submit',async event => {
 
 initEcosystem($('#ecosystem-root'));
 initEarn($('#earn-root'));
+initFinalEmblem($('.final-emblem'));
+initHoverEffects();
 initCursorTrail();
 initNetworkTicker($('#networks'));
 for(const id of ['asset','from-network','to-network']) enhanceSelect(document.getElementById(id),{kind:id==='asset'?'asset':'network'});
@@ -81,7 +85,8 @@ function escapeHTML(text){return text.replace(/&/g,'&amp;').replace(/</g,'&lt;')
 function showCode(lang){language=lang;document.querySelectorAll('[data-example]').forEach(b=>{b.classList.toggle('active',b.dataset.example===lang);b.setAttribute('aria-pressed',String(b.dataset.example===lang));});document.querySelectorAll('[data-language]').forEach(tab=>{const selected=tab.dataset.language===lang;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;});$('#code-panel').setAttribute('aria-labelledby',lang==='typescript'?'tab-ts':lang==='curl'?'tab-curl':'tab-webhook');$('#code-content').innerHTML=codeSamples[lang].split('\n').map(line=>line.trim().startsWith('//')||line.trim().startsWith('#')?`<span class="syntax-comment">${escapeHTML(line)}</span>`:escapeHTML(line).replace(/('[^']*'|&quot;[^&]*&quot;)/g,'<span class="syntax-string">$1</span>').replace(/\b(import|from|const|await|new)\b/g,'<span class="syntax-keyword">$1</span>')).join('\n');}
 document.querySelectorAll('[data-language]').forEach(tab=>{tab.addEventListener('click',()=>showCode(tab.dataset.language));tab.addEventListener('keydown',event=>{if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();const langs=[...document.querySelectorAll('[data-language]')].map(item=>item.dataset.language);showCode(langs[(langs.indexOf(language)+(event.key==='ArrowRight'?1:2))%3]);$(`[data-language="${language}"]`).focus();}});});showCode('typescript');
 document.querySelectorAll('[data-example]').forEach(button=>button.addEventListener('click',()=>{showCode(button.dataset.example);}));
-$('#copy-code').addEventListener('click',async()=>{if(await copyText(codeSamples[language],'Demo code copied.')){$('#copy-code').textContent='Copied ✓';setTimeout(()=>$('#copy-code').innerHTML='Copy <span>⧉</span>',2000);}});
+let copyFeedbackTimer;
+$('#copy-code').addEventListener('click',async()=>{if(await copyText(codeSamples[language],'Demo code copied.')){clearTimeout(copyFeedbackTimer);$('#copy-code .copy-label').textContent='Copied';copyFeedbackTimer=setTimeout(()=>$('#copy-code .copy-label').textContent='Copy',2000);}});
 
 let arcadeLoaded=false;let arcadeController; 
 async function loadArcade(){if(arcadeLoaded)return;arcadeLoaded=true;try{const {initArcade}=await import('./arcade.js');arcadeController=initArcade($('#arcade-root'));}catch(error){arcadeLoaded=false;$('#arcade-root').innerHTML='<div class="arcade-loading mono"><button id="retry-arcade" class="button">Reload arcade ↻</button></div>';$('#retry-arcade').addEventListener('click',loadArcade);}}
