@@ -1,7 +1,9 @@
+import { getPlanetTrailGeometry } from './planet.js';
+
 // Scattered hexadecimal ink, deposited on the page and faded in place.
 const CONTROLS = 'a,button,input,select,textarea,summary,[role="button"],[role="listbox"],[role="slider"],[contenteditable]:not([contenteditable="false"])';
 const PANELS = '.payment-terminal,.eco-preview,.product-preview,.code-terminal,.business-card';
-const FOREGROUND = `header,footer,dialog,${CONTROLS},.earn-term-option,.earn-confirmation-mark,img,video,iframe,[data-trail-obstacle],[data-no-trail],.planet-tag,.orbit-mark,.status-dot,.terminal-top i,.route-line,.mini-flow>i,.eco-asset-icon,.earn-rate-symbol`;
+const FOREGROUND = `.network-ticker-viewport,.eco-yield,.earn-rate-value,header,footer,dialog,${CONTROLS},.earn-term-option,.earn-confirmation-mark,img,video,iframe,[data-trail-obstacle],[data-no-trail],.planet-tag,.orbit-mark,.status-dot,.terminal-top i,.route-line,.mini-flow>i,.eco-asset-icon,.earn-rate-symbol`;
 const SOLID = `${FOREGROUND},${PANELS}`;
 const IGNORE_TEXT = `${FOREGROUND},script,style,template,svg,canvas,.sr-only`;
 const BURST_TARGETS = '.eco-cta,.earn-submit,#send-payment,.hero-actions .button';
@@ -26,10 +28,7 @@ export function initCursorTrail() {
   const ink = mask.getContext('2d');
   const burstLayer = document.createElement('canvas');
   const burstInk = burstLayer.getContext('2d');
-  // The planet is a transparent, locally rendered canvas, not a rectangular image.
-  const planetMask = document.createElement('canvas');
-  const planetInk = planetMask.getContext('2d', { willReadFrequently: true });
-  if (!ctx || !ink || !planetInk || !burstInk) return { destroy() {} };
+  if (!ctx || !ink || !burstInk) return { destroy() {} };
   document.body.append(canvas);
 
   let particles = [], previous = null, untilNext = nextSpacing();
@@ -43,6 +42,29 @@ export function initCursorTrail() {
   let visibleCache = new Map();
   let clearanceGrid = new Map(), clearanceCheck = 0;
   const paths = new WeakMap();
+  const maskCache = new Map();
+  let geometryRevision = 0, refreshUntil = 0, currentMask = null;
+  let lightRects = [], previousBounds = null;
+  const atlas = document.createElement('canvas');
+  const atlasInk = atlas.getContext('2d');
+  const atlasCell = 32, atlasScale = 2;
+  atlas.width = atlasCell * GLYPHS.length;
+  atlas.height = atlasCell * 2;
+  atlasInk.font = '18px "DM Mono", monospace';
+  atlasInk.textAlign = 'center';
+  atlasInk.textBaseline = 'middle';
+  function paintGlyphAtlas() {
+    atlasInk.clearRect(0, 0, atlas.width, atlas.height);
+    ['#bcff75', '#102008'].forEach((color, row) => {
+      atlasInk.fillStyle = color;
+      [...GLYPHS].forEach((glyph, column) => atlasInk.fillText(glyph, column * atlasCell + atlasCell / 2, row * atlasCell + atlasCell / 2));
+    });
+  }
+  paintGlyphAtlas();
+  function invalidate(structure = false) {
+    if (structure) dirty = true;
+    geometryRevision++;
+  }
   const enabled = () => finePointer.matches && !reducedMotion.matches && !document.hidden;
 
   function clear() {
@@ -54,12 +76,16 @@ export function initCursorTrail() {
     normalCount = burstCount = 0;
     hoveredCTA = null;
     ctx.clearRect(0, 0, width, height);
+    previousBounds = null;
   }
 
   function resize() {
     clear();
-    width = innerWidth;
-    height = innerHeight;
+    const needsCanvas = finePointer.matches && !reducedMotion.matches;
+    width = needsCanvas ? innerWidth : 0;
+    height = needsCanvas ? innerHeight : 0;
+    maskCache.clear();
+    currentMask = null;
     scale = Math.min(devicePixelRatio || 1, 2);
     canvas.width = Math.round(width * scale);
     canvas.height = Math.round(height * scale);
@@ -69,7 +95,7 @@ export function initCursorTrail() {
     mask.width = Math.ceil(width);
     mask.height = Math.ceil(height);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    dirty = true;
+    invalidate(true);
   }
 
   function visible(element) {
@@ -89,7 +115,7 @@ export function initCursorTrail() {
     dirty = false;
     words = [];
     solids = [...document.querySelectorAll(SOLID)].filter(element => !element.parentElement?.closest(FOREGROUND));
-    shapes = [...document.querySelectorAll(SVG_PAINT)].filter(element => !element.closest('defs,clipPath,mask,pattern,[data-trail-background]') && !element.closest(FOREGROUND));
+    shapes = [...document.querySelectorAll(SVG_PAINT)].filter(element => !element.closest('defs,clipPath,mask,pattern,[data-trail-background]') && !element.closest(FOREGROUND) && (!element.closest('.eco-instrument') || element.localName === 'text'));
     canvases = [...document.querySelectorAll('canvas')].filter(element => element !== canvas && !element.closest(FOREGROUND));
     finalSections = [...document.querySelectorAll('.final-section')];
     instruments = [...document.querySelectorAll('.eco-instrument')];
@@ -234,29 +260,27 @@ export function initCursorTrail() {
   }
 
   function paintPlanet(element, rect) {
-    // Half-resolution alpha is enough for these tiny glyphs and avoids reading a
-    // full retina canvas every frame. A 2px fringe protects antialiased edges.
-    const pw = Math.max(1, Math.ceil(rect.width / 2));
-    const ph = Math.max(1, Math.ceil(rect.height / 2));
-    if (planetMask.width !== pw || planetMask.height !== ph) {
-      planetMask.width = pw;
-      planetMask.height = ph;
-    }
-    try {
-      planetInk.clearRect(0, 0, pw, ph);
-      planetInk.drawImage(element, 0, 0, pw, ph);
-      const pixels = planetInk.getImageData(0, 0, pw, ph);
-      for (let i = 3; i < pixels.data.length; i += 4) pixels.data[i] = pixels.data[i] > 12 ? 255 : 0;
-      planetInk.putImageData(pixels, 0, 0);
-      ink.drawImage(planetMask, rect.left, rect.top, rect.width, rect.height);
-      for (const [x, y] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) ink.drawImage(planetMask, rect.left + x, rect.top + y, rect.width, rect.height);
-    } catch {
-      // A future cross-origin canvas must still protect the planet silhouette.
-      const radius = Math.min(rect.width * .367, rect.height * .389) * 1.025 + 4;
+    const geometry = getPlanetTrailGeometry(element);
+    const x = rect.left + rect.width * .505;
+    const y = rect.top + rect.height * .496;
+    const radius = geometry?.radius || Math.min(rect.width * .367, rect.height * .389) * 1.019;
+    protectedOvals.push({ x, y, rx: radius + 3, ry: radius + 3, cos: 1, sin: 0 });
+    ink.beginPath();
+    ink.arc(x, y, radius + 3, 0, TAU);
+    ink.fill();
+    if (!geometry?.width || !geometry.height) return;
+    ink.save();
+    ink.translate(rect.left, rect.top);
+    ink.scale(rect.width / geometry.width, rect.height / geometry.height);
+    // A small margin covers the orbit's slow motion between cached snapshots.
+    ink.lineWidth = 12;
+    for (const path of geometry.paths) ink.stroke(path);
+    for (const satellite of geometry.satellites) {
       ink.beginPath();
-      ink.arc(rect.left + rect.width * .505, rect.top + rect.height * .496, radius, 0, TAU);
+      ink.arc(satellite.x, satellite.y, satellite.radius + 3, 0, TAU);
       ink.fill();
     }
+    ink.restore();
   }
 
   function panelHidden(element, ignoredPanel) {
@@ -336,6 +360,36 @@ export function initCursorTrail() {
     }
   }
 
+  function useMask(panel, now) {
+    let entry = maskCache.get(panel);
+    if (!entry) {
+      const surface = document.createElement('canvas');
+      surface.width = mask.width;
+      surface.height = mask.height;
+      entry = { surface, context: surface.getContext('2d'), revision: -1, updated: -Infinity };
+      maskCache.set(panel, entry);
+    }
+    if (entry.revision !== geometryRevision || (entry.moving && now - entry.updated >= 80)) {
+      paintMask(panel);
+      const composite = entry.context;
+      composite.clearRect(0, 0, width, height);
+      composite.filter = 'blur(7px)';
+      composite.drawImage(mask, 0, 0);
+      composite.filter = 'none';
+      composite.drawImage(mask, 0, 0);
+      entry.grid = clearanceGrid;
+      entry.ovals = protectedOvals;
+      entry.lightRects = finalSections.filter(visible).map(element => element.getBoundingClientRect());
+      entry.moving = now < refreshUntil || canvases.some(element => element.id === 'orbit-planet' && onScreen(element.getBoundingClientRect()));
+      entry.revision = geometryRevision;
+      entry.updated = now;
+    }
+    clearanceGrid = entry.grid;
+    protectedOvals = entry.ovals;
+    lightRects = entry.lightRects;
+    currentMask = entry.surface;
+  }
+
   function drawParticles(list, target, now, lightRects) {
     target.textAlign = 'center';
     target.textBaseline = 'middle';
@@ -351,33 +405,44 @@ export function initCursorTrail() {
       const clearance = proximity(x, y, p.size);
       if (!clearance) continue;
       target.globalAlpha = p.alpha * Math.pow(1 - age, p.burst ? 1.7 : 1.35) * clearance;
-      target.fillStyle = lightRects.some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? '#102008' : '#bcff75';
-      target.font = `${p.size}px "DM Mono", monospace`;
+      const row = lightRects.some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? 1 : 0;
+      const side = atlasCell / atlasScale * p.size / 9;
       target.save();
       target.translate(x, y);
       target.rotate(p.rotation);
-      target.fillText(p.glyph, 0, 0);
+      target.drawImage(atlas, GLYPHS.indexOf(p.glyph) * atlasCell, row * atlasCell, atlasCell, atlasCell, -side / 2, -side / 2, side, side);
       target.restore();
     }
     target.globalAlpha = 1;
     target.globalCompositeOperation = 'destination-out';
-    target.filter = 'blur(7px)';
-    target.drawImage(mask, 0, 0, width, height);
-    target.filter = 'none';
-    target.drawImage(mask, 0, 0, width, height);
+    if (previousBounds) {
+      const { x, y, w, h } = previousBounds;
+      target.drawImage(currentMask, x, y, w, h, x, y, w, h);
+    }
     target.globalCompositeOperation = 'source-over';
   }
 
   function draw(now) {
     frame = 0;
-    ctx.clearRect(0, 0, width, height);
+    if (previousBounds) ctx.clearRect(previousBounds.x, previousBounds.y, previousBounds.w, previousBounds.h);
     if (!enabled() || document.querySelector('dialog[open]')) { clear(); return; }
     particles = particles.filter(p => now - p.born < p.life);
     normalCount = particles.reduce((count, p) => count + !p.burst, 0);
     burstCount = particles.length - normalCount;
-    if (!particles.length) return;
-    paintMask();
-    const lightRects = finalSections.filter(visible).map(element => element.getBoundingClientRect());
+    if (!particles.length) { previousBounds = null; return; }
+    let left = width, top = height, right = 0, bottom = 0;
+    for (const p of particles) {
+      const travel = p.burst ? 1 - Math.pow(1 - Math.max(0, (now - p.born) / p.life), 3) : 0;
+      const x = p.x - scrollX + (p.burst ? p.vx * travel : 0);
+      const y = p.y - scrollY + (p.burst ? p.vy * travel : 0);
+      left = Math.min(left, x - 16); top = Math.min(top, y - 16);
+      right = Math.max(right, x + 16); bottom = Math.max(bottom, y + 16);
+    }
+    left = Math.max(0, Math.floor(left)); top = Math.max(0, Math.floor(top));
+    right = Math.min(width, Math.ceil(right)); bottom = Math.min(height, Math.ceil(bottom));
+    if (right <= left || bottom <= top) { previousBounds = null; frame = requestAnimationFrame(draw); return; }
+    previousBounds = { x: left, y: top, w: right - left, h: bottom - top };
+    useMask(null, now);
     drawParticles(particles.filter(p => !p.panel), ctx, now, lightRects);
     // Payment bursts may enter ONLY their own panel's background. Draw that
     // group separately, retaining every word, control and artwork inside it,
@@ -385,11 +450,12 @@ export function initCursorTrail() {
     const panels = new Set(particles.filter(p => p.panel?.isConnected).map(p => p.panel));
     for (const panel of panels) {
       if (!visible(panel)) continue;
-      paintMask(panel);
+      useMask(panel, now);
       burstInk.clearRect(0, 0, width, height);
       drawParticles(particles.filter(p => p.panel === panel), burstInk, now, lightRects);
       ctx.drawImage(burstLayer, 0, 0, width, height);
     }
+    for (const key of maskCache.keys()) if (key && !panels.has(key)) maskCache.delete(key);
     frame = requestAnimationFrame(draw);
   }
 
@@ -462,7 +528,8 @@ export function initCursorTrail() {
     start();
   }
 
-  function resetPointer() {
+  function resetPointer(event) {
+    if (event?.type === 'scroll') invalidate();
     previous = null;
     untilNext = nextSpacing();
     hoveredCTA = null;
@@ -502,11 +569,20 @@ export function initCursorTrail() {
   }
 
   const observer = new MutationObserver(records => {
-    // Reuse text Ranges through animation-only SVG attribute updates; structure,
-    // text, classes and visibility changes rebuild the small semantic inventory.
-    if (records.some(record => record.type !== 'attributes' || !['d', 'transform', 'stroke-dashoffset', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'width', 'height'].includes(record.attributeName))) dirty = true;
+    const changed = records.filter(record => {
+      const element = record.target.nodeType === 1 ? record.target : record.target.parentElement;
+      return !element?.closest('svg,.eco-yield,.earn-rate-value,[data-no-trail]');
+    });
+    if (!changed.length) return;
+    invalidate(changed.some(record => record.type !== 'attributes'));
+    refreshUntil = performance.now() + 900;
   });
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'open'] });
+  const resizeObserver = new ResizeObserver(() => invalidate());
+  resizeObserver.observe(document.body);
+  const onTransition = () => { invalidate(); refreshUntil = performance.now() + 900; };
+  document.addEventListener('transitionrun', onTransition, true);
+  document.addEventListener('transitionend', onTransition, true);
   resize();
   window.addEventListener('pointermove', move, { passive: true });
   document.addEventListener('pointerover', pointerOver, { passive: true });
@@ -516,9 +592,9 @@ export function initCursorTrail() {
   window.addEventListener('blur', clear);
   document.documentElement.addEventListener('pointerleave', resetPointer);
   document.addEventListener('visibilitychange', clear);
-  finePointer.addEventListener('change', clear);
-  reducedMotion.addEventListener('change', clear);
-  const fontsReady = () => { if (!destroyed) dirty = true; };
+  finePointer.addEventListener('change', resize);
+  reducedMotion.addEventListener('change', resize);
+  const fontsReady = () => { if (!destroyed) { paintGlyphAtlas(); invalidate(true); } };
   document.fonts?.ready.then(fontsReady);
   document.fonts?.addEventListener('loadingdone', fontsReady);
 
@@ -526,6 +602,10 @@ export function initCursorTrail() {
     destroyed = true;
     clear();
     observer.disconnect();
+    resizeObserver.disconnect();
+    document.removeEventListener('transitionrun', onTransition, true);
+    document.removeEventListener('transitionend', onTransition, true);
+    maskCache.clear();
     window.removeEventListener('pointermove', move);
     document.removeEventListener('pointerover', pointerOver);
     document.removeEventListener('pointerout', pointerOut);
@@ -534,8 +614,8 @@ export function initCursorTrail() {
     window.removeEventListener('blur', clear);
     document.documentElement.removeEventListener('pointerleave', resetPointer);
     document.removeEventListener('visibilitychange', clear);
-    finePointer.removeEventListener('change', clear);
-    reducedMotion.removeEventListener('change', clear);
+    finePointer.removeEventListener('change', resize);
+    reducedMotion.removeEventListener('change', resize);
     document.fonts?.removeEventListener('loadingdone', fontsReady);
     canvas.remove();
   } };

@@ -1,6 +1,10 @@
 /** A quiet, living numerical planet. No dependencies or remote assets. */
 
 const TAU = Math.PI * 2;
+// Shared vector geometry lets the cursor protect the artwork without reading
+// pixels back from the GPU. The object stays local to this canvas instance.
+const trailGeometry = new WeakMap();
+export const getPlanetTrailGeometry = canvas => trailGeometry.get(canvas);
 const CAMERA = 5.2;
 const GLYPHS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '·'];
 const clamp = (n, low, high) => Math.min(high, Math.max(low, n));
@@ -107,6 +111,8 @@ export function initPlanet(canvas) {
   let pointerX = 0, pointerY = 0, targetX = 0, targetY = 0;
   let progress = 0, targetProgress = 0;
   let lastPaint = 0;
+  const exclusion = { x: 0, y: 0, radius: 0, width: 0, height: 0, paths: [], satellites: [] };
+  trailGeometry.set(canvas, exclusion);
 
   function requestFrame() {
     if (!frame && !disposed && visible && !doc.hidden) frame = win.requestAnimationFrame(tick);
@@ -114,7 +120,7 @@ export function initPlanet(canvas) {
 
   function readScroll() {
     targetProgress = clamp(win.scrollY / Math.max(600, win.innerHeight * 1.15), 0, 2);
-    bounds = canvas.getBoundingClientRect();
+    if (visible) bounds = canvas.getBoundingClientRect();
     if (reducedMotion) progress = targetProgress;
     requestFrame();
   }
@@ -167,25 +173,27 @@ export function initPlanet(canvas) {
 
   function drawOrbits(front) {
     for (const orbit of orbits) {
-      ctx.beginPath();
+      const path = new Path2D();
       let connected = false;
       for (let step = 0; step <= 240; step++) {
         const point = orbitPoint(orbit, (step / 240) * TAU);
         if ((point.z >= 0) !== front) { connected = false; continue; }
         const projected = project(point);
-        if (connected) ctx.lineTo(projected.x, projected.y);
-        else ctx.moveTo(projected.x, projected.y);
+        if (connected) path.lineTo(projected.x, projected.y);
+        else path.moveTo(projected.x, projected.y);
         connected = true;
       }
       ctx.strokeStyle = `rgba(198,255,112,${orbit.alpha * (front ? 1 : 0.47)})`;
       ctx.lineWidth = front ? 0.8 : 0.65;
-      ctx.stroke();
+      ctx.stroke(path);
+      exclusion.paths.push(path);
 
       const angle = orbit.phase + elapsed * orbit.speed + progress * 0.65;
       const satellite = orbitPoint(orbit, angle);
       if ((satellite.z >= 0) !== front) continue;
       const p = project(satellite);
       const size = orbit.size * Math.max(0.7, radius / 290) * p.scale;
+      exclusion.satellites.push({ x: p.x, y: p.y, radius: size + 6 });
       if (front) {
         const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 5.2);
         glow.addColorStop(0, 'rgba(199,255,117,0.25)');
@@ -222,6 +230,9 @@ export function initPlanet(canvas) {
     ctx.clearRect(0, 0, width, height);
     ctx.globalAlpha = 1;
     const silhouette = radius * CAMERA / Math.sqrt(CAMERA * CAMERA - 1);
+    Object.assign(exclusion, { x: centerX, y: centerY, radius: silhouette, width, height });
+    exclusion.paths = [];
+    exclusion.satellites = [];
     for (const orbit of orbits) {
       orbit.transform = rotation(
         orbit.y + pointerX * 0.035,
@@ -315,7 +326,7 @@ export function initPlanet(canvas) {
   const intersectionObserver = typeof win.IntersectionObserver === 'function' ? new win.IntersectionObserver(entries => {
     visible = entries[0].isIntersecting;
     previousTime = 0;
-    if (visible) requestFrame();
+    if (visible) { bounds = canvas.getBoundingClientRect(); requestFrame(); }
     else { win.cancelAnimationFrame(frame); frame = 0; }
   }, { rootMargin: '100px' }) : null;
 
@@ -347,6 +358,7 @@ export function initPlanet(canvas) {
     doc.removeEventListener('visibilitychange', visibilityChange);
     if (motionPreference.removeEventListener) motionPreference.removeEventListener('change', motionChange);
     else motionPreference.removeListener(motionChange);
+    trailGeometry.delete(canvas);
     ctx.clearRect(0, 0, width, height);
   };
 }
