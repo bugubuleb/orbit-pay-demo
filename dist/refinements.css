@@ -44,3 +44,8 @@
 .final-lockup{grid-template-columns:minmax(0,1fr) clamp(190px,33vw,460px)}
 @media(max-width:700px){.final-lockup{grid-template-columns:minmax(0,1fr) clamp(155px,35vw,250px)}}
 @media(max-width:440px){.final-lockup{grid-template-columns:1fr}.final-section .final-emblem{width:min(76vw,290px)}}
+
+.hero-play{display:inline-flex;align-items:center;justify-content:space-between;gap:28px;margin-top:18px;padding:0 20px;min-height:46px;background:#bcff7508;border:1px solid #536e3d;color:var(--lime);font-size:12px;pointer-events:auto}
+.hero-play:hover{background:#bcff7518;border-color:var(--lime)}
+.hero-play:hover .pixel-arrow{transform:translate(3px,-3px)}
+@media(max-width:760px){.hero .planet-stage{top:clamp(535px,85vw,630px)}.hero{min-height:calc(clamp(535px,85vw,630px) + 665px)}.hero-play{min-height:44px;margin-top:16px;font-size:11px}.hero-note{margin-top:20px}}

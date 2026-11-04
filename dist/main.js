@@ -127,9 +127,10 @@ $('#copy-code').addEventListener('click',async()=>{if(await copyText(codeSamples
 let arcadeLoaded=false;let arcadeController; 
 async function loadArcade(){if(arcadeLoaded)return;arcadeLoaded=true;try{const {initArcade}=await import('./arcade.js');arcadeController=initArcade($('#arcade-root'));}catch(error){arcadeLoaded=false;$('#arcade-root').innerHTML='<div class="arcade-loading mono"><button id="retry-arcade" class="button">Reload arcade ↻</button></div>';$('#retry-arcade').addEventListener('click',loadArcade);}}
 const arcadeDialog=$('#arcade-dialog');
-$('#open-arcade').addEventListener('click',async()=>{arcadeDialog.showModal();await loadArcade();});
+let arcadeOpener = $('#open-arcade');
+for (const button of [$('#hero-play'), $('#open-arcade')]) button.addEventListener('click',async()=>{arcadeOpener=button;arcadeDialog.showModal();await loadArcade();});
 $('#close-arcade').addEventListener('click',()=>arcadeDialog.close());
-arcadeDialog.addEventListener('close',()=>{arcadeController?.pause();$('#open-arcade').focus({preventScroll:true});});
+arcadeDialog.addEventListener('close',()=>{arcadeController?.pause();arcadeOpener.focus({preventScroll:true});});
 arcadeDialog.addEventListener('click',event=>{if(event.target===arcadeDialog){const b=arcadeDialog.getBoundingClientRect();if(event.clientX<b.left||event.clientX>b.right||event.clientY<b.top||event.clientY>b.bottom)arcadeDialog.close();}});
 
 function pixelArrows(root=document){
