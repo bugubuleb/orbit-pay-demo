@@ -1,6 +1,6 @@
 import { getPlanetTrailGeometry } from './planet.js';
 
-// Scattered hexadecimal ink, deposited on the page and faded in place.
+// A short hexadecimal tail follows the pointer; masks protect page content.
 const CONTROLS = 'a,button,input,select,textarea,summary,[role="button"],[role="listbox"],[role="slider"],[contenteditable]:not([contenteditable="false"])';
 const PANELS = '.payment-terminal,.eco-preview,.product-preview,.code-terminal,.business-card';
 const FOREGROUND = `.network-ticker-viewport,.eco-yield,.earn-rate-value,header,footer,dialog,${CONTROLS},.earn-term-option,.earn-confirmation-mark,img,video,iframe,[data-trail-obstacle],[data-no-trail],.planet-tag,.orbit-mark,.status-dot,.terminal-top i,.route-line,.mini-flow>i,.eco-asset-icon,.earn-rate-symbol`;
@@ -9,14 +9,20 @@ const IGNORE_TEXT = `${FOREGROUND},script,style,template,svg,canvas,.sr-only`;
 const BURST_TARGETS = '#hero-play,.eco-cta,.earn-submit,#send-payment,.hero-actions .button';
 const SVG_PAINT = 'svg path,svg circle,svg ellipse,svg rect,svg line,svg polyline,svg polygon,svg text,svg image,svg use';
 const GLYPHS = '0123456789abcdef';
-const LIFE = 2300;
+const LIFE = 2000;
+export const TRAIL_LENGTH = 114; // About 3 cm at the CSS reference pixel density.
+export function trailDistanceOpacity(distanceBehind) {
+  const head = Math.max(0, Math.min(1, distanceBehind / 7));
+  const end = Math.max(0, Math.min(1, (TRAIL_LENGTH - distanceBehind) / 32));
+  return head * head * (3 - 2 * head) * end * end * (3 - 2 * end);
+}
 export function trailOpacity(ageMs, life = LIFE) {
-  const fade = Math.max(0, Math.min(1, (ageMs - life * .2) / (life * .8)));
-  return 1 - fade * fade * (3 - 2 * fade);
+  const remaining = Math.max(0, Math.min(1, 1 - ageMs / life));
+  return remaining ** 1.3;
 }
 const CLEARANCE = 18;
 const GRID = 96;
-const nextSpacing = () => 2.2 + Math.random() * 2.8;
+const nextSpacing = () => 1.2 + Math.random();
 const LIMIT = 600;
 const BURST_RESERVE = 64;
 const TAU = Math.PI * 2;
@@ -37,6 +43,7 @@ export function initCursorTrail() {
 
   let particles = [], previous = null, untilNext = nextSpacing();
   let normalCount = 0, burstCount = 0;
+  let distanceTravelled = 0, lastPointer = null;
   let widthFrom = 5 + Math.random() * 13, widthTo = 5 + Math.random() * 13;
   let widthProgress = 0, widthSpan = 50 + Math.random() * 50;
   let frame = 0, width = 0, height = 0, scale = 1;
@@ -78,6 +85,7 @@ export function initCursorTrail() {
     untilNext = nextSpacing();
     particles = [];
     normalCount = burstCount = 0;
+    distanceTravelled = 0; lastPointer = null;
     hoveredCTA = null;
     ctx.clearRect(0, 0, width, height);
     previousBounds = null;
@@ -401,12 +409,13 @@ export function initCursorTrail() {
     for (const p of list) {
       const age = Math.max(0, (now - p.born) / p.life);
       // Only deliberate CTA bursts move. Ordinary ink keeps its original page
-      // coordinate, angle and size throughout its individual 2300ms lifetime.
+      // coordinate, angle and size throughout its individual 2000ms lifetime, within the latest 114px of pointer travel.
       const travel = p.burst ? 1 - Math.pow(1 - age, 3) : 0;
       const x = p.x - pageX + (p.burst ? p.vx * travel : 0);
       const y = p.y - pageY + (p.burst ? p.vy * travel : 0);
       if (x < -20 || x > width + 20 || y < -20 || y > height + 20) continue;
-      const clearance = proximity(x, y, p.size);
+      const tailFade = p.burst ? 1 : trailDistanceOpacity(distanceTravelled - p.distance);
+      const clearance = tailFade * proximity(x, y, p.size);
       if (!clearance) continue;
       target.globalAlpha = p.alpha * (p.burst ? Math.pow(1 - age, 1.7) : trailOpacity(now - p.born, p.life)) * clearance;
       const row = lightRects.some(rect => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) ? 1 : 0;
@@ -430,7 +439,7 @@ export function initCursorTrail() {
     frame = 0;
     if (previousBounds) ctx.clearRect(previousBounds.x, previousBounds.y, previousBounds.w, previousBounds.h);
     if (!enabled() || document.querySelector('dialog[open]')) { clear(); return; }
-    particles = particles.filter(p => now - p.born < p.life);
+    particles = particles.filter(p => now - p.born < p.life && (p.burst || distanceTravelled - p.distance < TRAIL_LENGTH));
     normalCount = particles.reduce((count, p) => count + !p.burst, 0);
     burstCount = particles.length - normalCount;
     if (!particles.length) { previousBounds = null; return; }
@@ -496,6 +505,10 @@ export function initCursorTrail() {
   }
 
   function move(event) {
+    if (event.pointerType === 'mouse') {
+      if (lastPointer) distanceTravelled += Math.hypot(event.clientX - lastPointer.x, event.clientY - lastPointer.y);
+      lastPointer = { x: event.clientX, y: event.clientY };
+    }
     if (!enabled() || event.pointerType !== 'mouse' || document.querySelector('dialog[open]') || event.target.closest?.(`header,footer,${CONTROLS},${PANELS},.earn-term-option`)) {
       previous = null;
       untilNext = nextSpacing();
@@ -507,17 +520,18 @@ export function initCursorTrail() {
     const dx = next.x - previous.x, dy = next.y - previous.y;
     const distance = Math.hypot(dx, dy);
     if (!distance) return;
-    let at = Math.max(untilNext, distance - 320);
+    let at = Math.max(untilNext, distance - TRAIL_LENGTH);
     let advanced = 0;
     while (at <= distance) {
       const fraction = at / distance;
-      const angle = Math.random() * TAU;
       const envelope = advanceWidth(at - advanced);
       advanced = at;
-      const spread = Math.sqrt(Math.random()) * envelope;
+      const spread = (Math.random() * 2 - 1) * envelope;
+      const jitter = (Math.random() - .5) * 4;
       add({
-        x: previous.x + dx * fraction + Math.cos(angle) * spread + scrollX,
-        y: previous.y + dy * fraction + Math.sin(angle) * spread + 5 + scrollY,
+        x: previous.x + dx * fraction - dy / distance * spread + dx / distance * jitter + scrollX,
+        y: previous.y + dy * fraction + dx / distance * spread + dy / distance * jitter + 5 + scrollY,
+        distance: distanceTravelled - distance + at,
         // Interpolate a separate deposition time through each mouse sample.
         // A shared lifetime makes the oldest deposits finish fading first.
         born: previous.time + (now - previous.time) * fraction,
@@ -534,6 +548,7 @@ export function initCursorTrail() {
 
   function resetPointer(event) {
     if (event?.type === 'scroll') invalidate();
+    lastPointer = null;
     previous = null;
     untilNext = nextSpacing();
     hoveredCTA = null;

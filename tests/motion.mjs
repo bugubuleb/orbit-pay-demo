@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { initCursorTrail, trailOpacity } from '../dist/cursor-trail.js';
+import { initCursorTrail, trailOpacity, trailDistanceOpacity, TRAIL_LENGTH } from '../dist/cursor-trail.js';
 import { initPlanet, getPlanetTrailGeometry } from '../dist/planet.js';
 
 // A deterministic clock verifies work scheduling and lifecycle contracts. Real
 // paint, hover contours and responsive layout are checked in the browser.
 let now = 0, serial = 0, reads = 0, glyphDraws = 0;
 const frames = new Map(), mutations = [], created = [];
+let paintedPoints = [];
 const events = () => ({
   listeners: new Map(),
   addEventListener(name, fn) { if (!this.listeners.has(name)) this.listeners.set(name, new Set()); this.listeners.get(name).add(fn); },
@@ -18,7 +19,8 @@ const node = () => ({ ...events(), isConnected:true, parentElement:null, closest
 const context = () => new Proxy({}, { get(target, key) {
   if (key in target) return target[key];
   if (key === 'getImageData') return () => { throw new Error('GPU pixel readback must not occur'); };
-  if (key === 'drawImage') return image => { if (image?.width === 512 && image?.height === 64) glyphDraws++; };
+  if (key === 'translate') return (x,y) => { target.point = [x,y]; };
+  if (key === 'drawImage') return image => { if (image?.width === 512 && image?.height === 64) { glyphDraws++; paintedPoints.push(target.point); } };
   if (key === 'createRadialGradient' || key === 'createLinearGradient') return () => ({ addColorStop() {} });
   if (key === 'measureText') return () => ({width:10,actualBoundingBoxLeft:0,actualBoundingBoxRight:10});
   return () => {};
@@ -50,8 +52,13 @@ const pointer = (x,y=220,target=node()) => globalThis.emit('pointermove',{pointe
 function deposit() { pointer(100);now+=40;pointer(210);step(now+16); }
 
 assert.ok(trailOpacity(2200) < trailOpacity(1500), 'older segments fade before newer ones');
-assert.equal(trailOpacity(2300), 0);
+assert.equal(trailOpacity(2000), 0);
 assert.ok(trailOpacity(1900)>0, 'a later segment survives after an earlier segment expires');
+assert.equal(TRAIL_LENGTH, 114);
+assert.equal(trailDistanceOpacity(114), 0, 'no ink survives beyond the 3cm tail');
+assert.equal(trailDistanceOpacity(500), 0);
+assert.ok(trailDistanceOpacity(105) < trailDistanceOpacity(50), 'the distant end fades smoothly');
+assert.equal(trailDistanceOpacity(0), 0, 'glyphs sit a few pixels behind the pointer');
 let trail=initCursorTrail();
 deposit();
 assert.ok(glyphDraws>0,'moving in empty space draws glyphs');
@@ -67,6 +74,13 @@ mutations.at(-1).fn([{type:'childList',target:body}]);step(now+16);
 assert.ok(reads>scrolledReads,'content changes rebuild the obstacle inventory');
 step(now+3000);
 assert.equal(frames.size,0,'trail stops requesting frames once the final glyph expires');
+paintedPoints=[];
+now+=50;pointer(0);now+=40;pointer(600);step(now+16);
+assert.ok(paintedPoints.length>0);
+assert.ok(paintedPoints.every(([x])=>x>=600-TRAIL_LENGTH-3 && x<=600+3), 'a 600px sweep paints only the latest 114px, including at high speed');
+assert.ok(frames.size>0, 'fast sweeps retain a short tail');
+step(now+2001);
+assert.equal(frames.size,0, 'the tail fully disappears within two seconds after stopping');
 const drawsAtRest=glyphDraws;step(now+100);
 assert.equal(glyphDraws,drawsAtRest,'a stationary pointer emits no more glyphs');
 trail.destroy();
